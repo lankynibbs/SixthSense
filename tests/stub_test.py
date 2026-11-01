@@ -1,0 +1,480 @@
+import lupa.lua51 as l
+r=l.LuaRuntime()
+r.execute(r'''
+os.getenv=function(k) return "/tmp/rh" end
+local W={}; cam={}; enemy={}; ov={}; rt={}; local tt=0
+rects=0
+Application={worlds=function() return {W} end, resolution=function() return 1920,1080 end}
+World={num_units=function() return 4 end, units=function() return {cam,enemy,rt,ov} end,
+ create_screen_gui=function() return {} end, destroy_gui=function() end, units_by_resource=function(w,id) if id=="1a7fcdff98c664b0" then return {enemy} end return {} end}
+local names={[cam]="#ID[aaaaaaaaaaaaaaaa]",[enemy]="#ID[1a7fcdff98c664b0]",[rt]="#ID[46cab355bd8d4d37]",[ov]="#ID[1234567890abcdef]"}
+Unit={alive=function() return true end, num_cameras=function(u) return u==cam and 1 or 0 end, camera=function() return "c" end,
+ resource_name=function(u) return setmetatable({},{__tostring=function() return names[u] end}) end,
+ has_animation_state_machine=function(u) return u~=cam end,
+ world_position=function(u) if u==rt then error("CRASH: runtime unit asked") end tt=tt+1 if u==ov then return {5,-15+(tt%7)*2,0} end return {0,-10,0} end}
+Camera={world_position=function() return {0,0,0} end, world_rotation=function() return "q" end}
+Quaternion={forward=function() return {0,1,0} end}
+Vector3=setmetatable({to_elements=function(v) return v[1],v[2],v[3] end},{__call=function(_,a,b,c) return {a,b,c} end})
+IdString64={from_hex=function(h) return h end}
+Vector2=function(a,b) return {a,b} end
+Color=function(a,r,g,b) return {a,r,g,b} end
+Gui={rect=function() rects=rects+1 end, text=function() end}
+Application.main_world=function() return W end
+Application.back_buffer_size=function() return 2560,1440 end
+stingray={Vector3=Vector3,Vector2=Vector2,Color=Color}
+Vector3=nil; Vector2={}
+''')
+r.execute(open('src/rear_heat_hud.lua').read().replace('\\\\','/'))
+for i in range(4000): r.eval('update')(0.016)
+print('rects',r.eval('rects'))
+
+# ---------------------------------------------------------------- v1.0: calibration with simulated mouse and keys
+import os, re
+LOGDIR = '/tmp/rh/CowboyBingus/Helldivers2/Logs'
+os.makedirs(LOGDIR, exist_ok=True)
+INI = LOGDIR + '/rear_heat_hud.ini'
+if os.path.exists(INI): os.remove(INI)
+open(INI, 'w').write('calibrate=true\nbar_debug=true\narea_x0=300\narea_y0=200\narea_x1=1366.67\narea_y1=971.45\n')   # an older ini with a saved area (scale 0.5)
+SRC = open('src/rear_heat_hud.lua').read().replace('\\\\', '/')
+PRE = r'''
+MX, MY, LMB, WHEEL, DZ = 960, 540, 0, 0, {1, 0.05}
+PRESSED, HELD = {}, {}
+local KEYS = {["f7"]=1, left=2, right=3, up=4, down=5, ["left shift"]=6, ["right shift"]=7, ["numpad +"]=8, ["="]=9, ["numpad -"]=10, ["-"]=11, ["["]=12, ["]"]=13, [";"]=14, ["'"]=15}
+Mouse = {axis_index=function(n) return ({cursor=0, mouse=1, wheel=2})[n] end, button_index=function(n) return n=="left" and 0 or nil end,
+  axis=function(i) if i==0 then return stingray.Vector3(MX, MY, 0) elseif i==2 then return stingray.Vector3(0, WHEEL, 0) end return stingray.Vector3(0,0,0) end,
+  button=function(i) return LMB end, num_axes=function() return 3 end, num_buttons=function() return 5 end,
+  dead_zone=function(i) return DZ[1], DZ[2] end, set_dead_zone=function(i, m, s) DZ = {m, s} end}
+Keyboard = {button_index=function(n) return KEYS[n] end, pressed=function(i) return PRESSED[i] == true end,
+  button=function(i) return (HELD[i] or PRESSED[i]) and 1 or 0 end}
+Window = {get_main_window=function() return "win" end, show_cursor=function() return true end}
+'''
+def runtime():
+    r = l.LuaRuntime()
+    r.execute(open('tests/stub_test.py').read().split("r.execute(r'''")[1].split("''')")[0])
+    r.execute(PRE)
+    r.execute(SRC)
+    return r
+r = runtime()
+G = r.globals()
+upd = r.eval('update')
+def frames(n=1):
+    for _ in range(n):
+        upd(0.016)
+        r.execute('PRESSED = {}'); G.WHEEL = 0
+def area(): c = G.REAR_HEAT_HUD_CAL; return c.x0, c.y0, c.x1, c.y1
+def scale(): c = G.REAR_HEAT_HUD_CAL; return (c.x1 - c.x0) / c.bw
+SW, SH, RW, RH, SX, SY, GT = 2560, 1440, 1920, 1080, 1.2, 0.9333, 1080
+def to_window(gx, gy):       # gui -> the cursor axis (window px, from the bottom, y up)
+    px, py = gx * SX, (GT - gy) * SY
+    return px * RW / SW, (SH - py) * RH / SH
+def key(name): r.execute('PRESSED[%d] = true' % {'f7':1,'left':2,'right':3,'up':4,'down':5,'plus':8,'minus':10}[name]); frames(1)
+fails = []
+def check(ok, what): print(('PASS ' if ok else 'FAIL ') + what); (None if ok else fails.append(what))
+frames(200)                              # settle + first draws
+a0 = area(); check(abs(a0[0] - 300) < 1e-6 and abs(a0[3] - 971.45) < 1e-6, 'the saved area loads unchanged from an older ini %s' % (a0,))
+# drag inside the area: +200 window px right, +100 up
+cx, cy = (a0[0] + a0[2]) / 2, (a0[1] + a0[3]) / 2 - 100
+G.MX, G.MY = to_window(cx, cy); frames(2)
+G.LMB = 1; frames(1)
+for k in range(10):
+    G.MX += 20; G.MY += 10; frames(1)
+G.LMB = 0; frames(1)
+a1 = area(); dx = a1[0] - a0[0]; dy = a1[3] - a0[3]
+check(abs(dx - 200 * SW / RW / SX) < 1 and abs(dy - 100 * SH / RH / SY) < 1, 'drag moved the area by gui %.1f, %.1f (expected %.1f, %.1f)' % (dx, dy, 200 * SW / RW / SX, 100 * SH / RH / SY))
+check(abs(scale() - 0.5) < 1e-3, 'drag kept the scale')
+# wheel
+s0 = scale(); G.WHEEL = 3; upd(0.016); G.WHEEL = 0; frames(1)
+check(scale() > s0 * 1.05, 'wheel up scaled %.3f -> %.3f' % (s0, scale()))
+# +/- keys
+s0 = scale(); key('plus'); key('minus'); check(abs(scale() - s0) < 1e-12, '+/- keys no longer scale (mouse only)')
+# arrows, plain and with shift
+x0 = area()[0]; key('left'); check(abs(area()[0] - (x0 - 2 / SX)) < 1e-6, 'left arrow nudged 2 px')
+r.execute('HELD[6] = true'); x0 = area()[0]; key('right'); check(abs(area()[0] - (x0 + 20 / SX)) < 1e-6, 'shift+right nudged 20 px'); r.execute('HELD = {}')
+y1 = area()[3]; key('up'); check(abs(area()[3] - (y1 + 2 / SY)) < 1e-6, 'up arrow moved the area up (gui y +)')
+# slider: press on the knob, drag right
+c = G.REAR_HEAT_HUD_CAL
+w, h = 600 / SX, 16 / SY
+scx = min(max((c.x0 + c.x1) / 2, w / 2 + 20), c.bw - w / 2 - 20)
+top = min(max(c.y1 - (c.y1 - c.y0) * 0.08, GT - c.bh + h + 40 / SY), GT - 40 / SY)
+tx, ty = scx - w / 2, top - h
+kx = tx + w * (scale() - 0.25) / (2.5 - 0.25)
+G.MX, G.MY = to_window(kx, ty + h / 2); frames(1)
+G.LMB = 1; frames(1); s0 = scale(); area_before = area()
+G.MX, G.MY = to_window(tx + w * 0.3, ty + h / 2); frames(3)
+G.LMB = 0; frames(1)
+check(abs(scale() - (0.25 + 2.25 * 0.3)) < 0.02, 'slider drag set the scale %.3f -> %.3f' % (s0, scale()))
+ca = ((area_before[0] + area_before[2]) / 2, (area_before[1] + area_before[3]) / 2); cb = ((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2)
+check(('area clamped (scale)' in open(LOGDIR + '/rear_heat_hud.log').read()) or abs(ca[0] - cb[0]) < 1e-3 and abs(ca[1] - cb[1]) < 1e-3, 'slider scaled around the centre (or was clamped)')
+check(area()[1] >= -1e-6 and area()[2] <= c.bw + 1e-6, 'after scaling: bottom >= 0 and right <= visible width (%.1f, %.1f)' % (area()[1], area()[2]))
+# drag far down and right: clamped
+s_before = scale(); G.MX, G.MY = to_window(c.bw * 0.5, GT * 0.5); frames(1); G.LMB = 1; frames(1)
+for k in range(20): G.MY -= 40; G.MX += 40; frames(1)
+G.LMB = 0; frames(1)
+check(abs(area()[1]) < 1e-6 or area()[1] > 0, 'drag down: bottom clamped at gy %.2f' % area()[1])
+check(area()[2] <= c.bw + 1e-6, 'drag right: right edge clamped at gx %.1f (max %.1f)' % (area()[2], c.bw))
+lg = open(LOGDIR + '/rear_heat_hud.log').read()
+check('drawable gui bounds' in lg and 'area clamped (move)' in lg, 'bounds and clamp logged')
+# the ini gets the area after the 0.5 s throttle
+frames(40)
+ini = open(INI).read()
+vals = {k: float(v) for k, v in re.findall(r'^(area_\w+)=([-\d.]+)', ini, re.M)}
+a = area()
+check(all(abs(vals['area_' + k] - v) < 0.01 for k, v in zip(('x0', 'y0', 'x1', 'y1'), a)) and abs(vals['area_scale'] - scale()) < 1e-3, 'ini has the area %s' % vals)
+# F8: off, saved, mouse given back, only the bars drawn
+key('f7'); ini = open(INI).read()
+check('calibrate=false' in ini and 'toggle_key=f7' in ini, 'F7 saved calibrate=false')
+check(abs(r.eval('DZ[2]') - 0.05) < 1e-9, 'mouse dead zone untouched / given back')
+n0 = r.eval('rects'); frames(1); rd = G.REAR_HEAT_HUD_RADAR; check(r.eval('rects') - n0 == rd.rects and rd.rects <= 300, 'calibrate off: only the radar drawn (%d rects incl. player marker; radar %d)' % (r.eval('rects') - n0, rd.rects))
+log = open(LOGDIR + '/rear_heat_hud.log').read()
+check('area calibration off (f7): gui left' in log and 'screen px' in log, 'edges logged in gui and screen px')
+check('input: mouse move 1: cursor axis raw' in log, 'raw mouse moves logged')
+# restart: the area loads from the ini, calibration stays off
+r2 = runtime(); u2 = r2.eval('update')
+for _ in range(200): u2(0.016)
+c2 = r2.globals().REAR_HEAT_HUD_CAL
+check(abs(c2.x0 - a[0]) < 0.01 and abs(c2.y1 - a[3]) < 0.01 and not c2.on, 'restart loads the saved area, calibration off')
+# hidden game cursor: the mouse is held (dead zone) and the cursor axis moves still move the drawn cursor
+r3 = runtime(); r3.execute('Window.show_cursor = function() return false end'); os.remove(INI)
+r3 = runtime(); r3.execute('Window.show_cursor = function() return false end'); u3 = r3.eval('update')
+for _ in range(200): u3(0.016)
+g3 = r3.globals(); g3.MX = 300; u3(0.016); g3.MX = 340; u3(0.016)
+check(r3.eval('DZ[2]') == 917351, 'hidden cursor: the mouse is held while calibrating')
+# ---------------------------------------------------------------- v1.1: tracking, sectors, smoothing, migration
+ini = open(INI).read()
+check('bar_debug=false' in ini and 'v110_migrated=true' in ini, 'bar_debug forced false once in the older ini')
+r4 = runtime(); r4.execute('''
+EX, EY, EALIVE = 0, -10, true
+Unit.world_position = function(u) if u == rt then error("CRASH") end if u == enemy then JIT = (JIT or 0) + 1; return stingray.Vector3(EX + 0.1 * math.sin(JIT * 0.7), EY, 0) end return stingray.Vector3(50, 50, 0) end
+Unit.alive = function(u) if u == enemy then return EALIVE end return true end
+Window.show_cursor = function() return true end''')
+u4 = r4.eval('update'); g4 = r4.globals()
+def run4(sec):
+    for _ in range(int(sec / 0.016)): u4(0.016)
+# reach the mod's state table S through update -> step upvalues
+r4.execute('''
+local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end
+local step = find(update, "step"); HUD_S = find(step, "S")''')
+S4 = g4.HUD_S
+run4(4)
+def H(): return [S4.heat[i] for i in (1, 2, 3)]
+check(H()[1] > 0.5 and H()[0] < 0.01 and H()[2] < 0.01, 'enemy straight behind -> centre bar %s' % H())
+# steady: sample every frame for 3 s, heat must not dip
+mins = 9
+for _ in range(190): u4(0.016); mins = min(mins, S4.heat[2])
+check(mins > 0.5, 'steady centre heat while the enemy stays behind (min %.2f)' % mins)
+# left-rear: fwd is +y, x right; enemy at (-6, -6) is behind-left (bearing -135)
+g4.EX, g4.EY = -6, -6; run4(4)
+check(H()[0] > 0.3 and H()[2] < 0.01, 'behind-left -> L bar (not mirrored) %s' % H())
+g4.EX, g4.EY = 6, -6; run4(4)
+check(H()[2] > 0.3 and H()[0] < 0.01, 'behind-right -> R bar %s' % H())
+# rear 180: bearing 100 (just behind the side) counts, bearing 80 does not
+import math
+g4.EX, g4.EY = 10 * math.sin(math.radians(100)), 10 * math.cos(math.radians(100)); run4(4)
+check(H()[2] > 0.3, 'bearing +100 counts in R %s' % H())
+g4.EX, g4.EY = 10 * math.sin(math.radians(80)), 10 * math.cos(math.radians(80)); run4(4)
+check(sum(H()) < 0.01, 'bearing +80 (in front of the side) counts nowhere %s' % H())
+# rise ~0.15 s, hold 1 s, fade 1.5 s
+g4.EX, g4.EY = 0, -10; run4(0.16); h1 = S4.heat[2]; tg = S4.target[2]
+check(h1 > 0.9 * tg, 'rise: %.2f of target %.2f after 0.16 s' % (h1, tg))
+run4(2); peak = S4.heat[2]
+g4.EX, g4.EY = 0, 10; run4(0.9); hh = S4.heat[2]
+check(abs(hh - peak) < 0.02 * peak, 'hold: unchanged 0.9 s after the enemy moved in front (%.2f)' % hh)
+run4(0.8); hm = S4.heat[2]
+check(0.05 < hm < peak, 'fading after the hold (%.2f)' % hm)
+run4(1.2); check(S4.heat[2] < 0.01, 'faded out by 2.7 s (%.3f)' % S4.heat[2])
+# dead: dropped from tracking
+g4.EX, g4.EY = 0, -10; run4(1); g4.EALIVE = False; run4(0.2)
+check(S4.nT == 0 or S4.target[2] == 0, 'dead enemy dropped (tracked %d, target %.2f)' % (S4.nT, S4.target[2]))
+lg = open(LOGDIR + '/rear_heat_hud.log').read()
+check(re.search(r'nearest 1a7fcdff98c664b0 known .* bearing [-+]\d+ \((left|right)\) -> (bar [LCR]|front, no bar)', lg) is not None, 'nearest threat logged with id, distance, bearing and bar')
+ini2 = open(INI).read()
+check(all(k in ini2 for k in ('area_x0=', 'area_y0=', 'area_x1=', 'area_y1=')), 'area keys still in the ini')
+# ---------------------------------------------------------------- v1.2: sensitivity and repeat_rate
+open(INI, 'w').write('calibrate=true\nbar_debug=false\nv110_migrated=true\nrange=40\narea_x0=300\narea_y0=200\narea_x1=1366.67\narea_y1=971.45\narea_scale=0.5\nswap_sides=false\n')
+r5 = runtime(); r5.execute('''
+EX, EY = 0, -10
+Unit.world_position = function(u) if u == rt then error("CRASH") end if u == enemy then JIT = (JIT or 0) + 1; return stingray.Vector3(EX + 0.1 * math.sin(JIT * 0.7), EY, 0) end return stingray.Vector3(50, 50, 0) end
+local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end
+local step = find(update, "step"); HUD_S = find(step, "S"); HUD_CFG = find(step, "CFG") or find(find(step, "threat") or step, "CFG")''')
+u5 = r5.eval('update'); g5 = r5.globals()
+def run5(sec):
+    for _ in range(max(1, int(sec / 0.016))): u5(0.016); r5.execute('PRESSED = {}'); g5.WHEEL = 0
+S5 = g5.HUD_S
+CFG5 = g5.HUD_CFG
+run5(3.5)
+check(CFG5 is not None and abs(CFG5.sensitivity - 1) < 1e-9 and abs(CFG5.repeat_rate - 1) < 1e-9, 'defaults sensitivity 1.0, repeat_rate 1.0')
+def press5(i): r5.execute('PRESSED[%d] = true' % i); run5(0.016)
+for k in (12, 13, 14, 15): press5(k)
+r5.execute('HELD[6] = true'); press5(12); press5(13); r5.execute('HELD = {}')
+check(abs(CFG5.sensitivity - 1) < 1e-9 and abs(CFG5.repeat_rate - 1) < 1e-9, "[ ] ; ' keys do nothing (sliders are mouse only)")
+def drag_slider(i, frac):
+    tx, ty, tw, th = r5.eval('function(i) return REAR_HEAT_HUD_SLIDER(i) end')(i)
+    kx = None
+    g5.MX, g5.MY = to_window(tx + tw * 0.5, ty + th / 2); run5(0.02)
+    g5.LMB = 1; run5(0.02)
+    g5.MX, g5.MY = to_window(tx + tw * frac, ty + th / 2); run5(0.05)
+    g5.LMB = 0; run5(0.02)
+a_before = area()
+c5 = g5.REAR_HEAT_HUD_CAL
+a_before = (c5.x0, c5.y0, c5.x1, c5.y1); sc_before = (c5.x1 - c5.x0) / c5.bw
+drag_slider(2, (2.0 - 0.25) / 2.75); check(abs(CFG5.sensitivity - 2.0) < 0.02, 'orange slider drag set sensitivity %.3f' % CFG5.sensitivity)
+drag_slider(3, (2.0 - 0.25) / 2.75); check(abs(CFG5.repeat_rate - 2.0) < 0.02, 'magenta slider drag set repeat_rate %.3f' % CFG5.repeat_rate)
+check(abs((c5.x1 - c5.x0) / c5.bw - sc_before) < 1e-9 and abs(c5.x0 - a_before[0]) < 1e-9 and abs(c5.y1 - a_before[3]) < 1e-9, 'setting sliders leave the area and its scale alone')
+# effect on range: sens 2 -> 80 m; an enemy behind at 60 m counts; at sens 1 it doesn't
+r5.execute('HUD_CFG.sensitivity = 2.0'); g5.EX, g5.EY = 0, -60; run5(0.5)
+check(abs(S5.eff_range - 80) < 1e-9 and S5.target[2] > 0, 'sensitivity 2: range 80 m, enemy at 60 m counts (%.2f)' % S5.target[2])
+t2 = None
+r5.execute('HUD_CFG.sensitivity = 1.0'); run5(0.5)
+check(abs(S5.eff_range - 40) < 1e-9 and S5.target[2] == 0, 'sensitivity 1: range 40 m, enemy at 60 m ignored')
+r5.execute('HUD_CFG.sensitivity = 3.0'); run5(0.5); check(abs(S5.eff_range - 120) < 1e-9, 'range clamps at 120 m')
+# gain: same enemy at 10 m, sens 2 gives twice the threat of sens 1
+g5.EX, g5.EY = 0, -10
+r5.execute('HUD_CFG.sensitivity = 1.0'); run5(0.3); t1 = S5.target[2]
+r5.execute('HUD_CFG.sensitivity = 2.0'); run5(0.3); t2 = S5.target[2]
+check(t1 > 0 and t2 > 2 * t1 * 0.99, 'sensitivity 2 raises the gain (%.2f vs %.2f; range also grew)' % (t2, t1))
+r5.execute('HUD_CFG.sensitivity = 1.0')
+# hold and fade at repeat_rate 2: hold 0.5 s, fade 0.75 s
+r5.execute('HUD_CFG.repeat_rate = 2.0'); run5(1.5); peak = S5.heat[2]
+g5.EX, g5.EY = 0, 10; run5(0.4); check(abs(S5.heat[2] - peak) < 1e-6, 'rate 2: still held at 0.4 s')
+run5(0.35); check(S5.heat[2] < peak, 'rate 2: fading by 0.75 s (%.2f < %.2f)' % (S5.heat[2], peak))
+run5(0.6); check(S5.heat[2] < 0.01, 'rate 2: gone by 1.35 s (hold 0.5 + fade 0.75)')
+# re-acquire interval 0.5 / rate
+r5.execute('HUD_CFG.repeat_rate = 2.0'); run5(0.1); n0 = S5.next_known - S5.t
+check(0 < n0 <= 0.25 + 1e-6, 'rate 2: known enemies re-acquired every 0.25 s (next in %.3f)' % n0)
+# saved to the ini (throttled), area keys untouched by settings
+r5.execute('HUD_CFG.sensitivity = 1.55; HUD_CFG.repeat_rate = 0.8; REAR_HEAT_HUD_CAL.dirty = true'); run5(1.0)
+ini5 = open(INI).read(); vals = dict(re.findall(r'^(\w+)=(.*)$', ini5, re.M))
+check(vals.get('sensitivity') == '1.55' and vals.get('repeat_rate') == '0.80', 'ini has sensitivity %s repeat_rate %s' % (vals.get('sensitivity'), vals.get('repeat_rate')))
+check(abs(float(vals['area_x0']) - c5.x0) < 0.01 and abs(float(vals['area_x0']) - 300) < 0.01 and abs(float(vals['area_y1']) - 971.45) < 0.01 and vals.get('range') == '40' and vals.get('swap_sides') == 'false', 'area and other ini keys untouched')
+lg = open(LOGDIR + '/rear_heat_hud.log').read()
+r6 = runtime(); r6.execute('''local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end
+HUD_CFG = find(find(update, "step"), "CFG")''')
+C6 = r6.globals().HUD_CFG
+check(abs(C6.sensitivity - 1.55) < 1e-9 and abs(C6.repeat_rate - 0.8) < 1e-9, 'restart loads sensitivity and repeat_rate from the ini')
+check('settings changed: sensitivity' in lg and 'sens_' not in lg and 'input: key plus' not in lg, 'settings logged; no slider key lookups')
+# ---------------------------------------------------------------- v1.3: the radar
+open(INI, 'w').write('calibrate=false\nv110_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\narea_scale=1\nsensitivity=1.00\nrepeat_rate=1.00\n')
+def radar_rt(extra=''):
+    rr = runtime(); rr.execute('''
+EX, EY, EALIVE = 0, 20, true
+DOTS = {}
+FWDX, FWDY = 0, 1
+Quaternion.forward = function() return {FWDX, FWDY, 0} end
+Unit.world_position = function(u) if u == rt then error("CRASH") end if u == enemy then JIT = (JIT or 0) + 1; return stingray.Vector3(EX + 0.1 * math.sin(JIT * 0.7), EY, 0) end return stingray.Vector3(500, 500, 0) end
+Unit.alive = function(u) if u == enemy then return EALIVE end return true end
+Gui.rect = function(g, p, sz, c) rects = rects + 1; if c[2] == 255 and c[3] == 40 and c[4] == 40 then DOTS[#DOTS + 1] = {p[1] + sz[1] / 2, p[2] + sz[2] / 2, sz[1], sz[2], c[1]} end end
+local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end
+local step = find(update, "step"); HUD_S = find(step, "S"); HUD_CFG = find(step, "CFG")''' + extra)
+    return rr
+r7 = radar_rt(); u7 = r7.eval('update'); g7 = r7.globals()
+def run7(sec):
+    for _ in range(max(1, int(sec / 0.016))): r7.execute('DOTS = {}'); u7(0.016)
+run7(3.5)
+I7 = g7.REAR_HEAT_HUD_RADAR
+def dot7():
+    D = g7.DOTS
+    if not D or len(D) == 0: return None
+    d = D[1]; return ((d[1] - I7.cx) / I7.rx, (d[2] - I7.cy) / I7.ry, d[3], d[5])
+def ghost7():
+    for d in (g7.DOTS or {}).values():
+        y = (d[2] - I7.cy) / I7.ry
+        if abs(y + 0.5) < 0.05: return ((d[1] - I7.cx) / I7.rx, y, d[3], d[5])
+    return None
+check(I7.style == 'dots', 'no texture support in the stub -> style dots')
+# camera faces +y; x is right
+for (ex, ey, want, what) in ((0, 20, (0, 0.5), 'front 20 m -> up, half radius'), (0, -20, (0, -0.5), 'behind -> down'),
+                             (-20, 0, (-0.5, 0), 'left -> left'), (20, 0, (0.5, 0), 'right -> right'),
+                             (0, -40 / 3, (0, -1 / 3), 'behind at 1/3 range -> on the inner ring')):
+    g7.EX, g7.EY = ex, ey; run7(0.1); p = dot7()
+    check(p is not None and abs(p[0] - want[0]) < 0.02 and abs(p[1] - want[1]) < 0.02, '%s %s' % (what, p and ('%.3f, %.3f' % p[:2])))
+# the camera turned to face +x: an enemy at +x is now in front (up), one at +y is on the left
+g7.FWDX, g7.FWDY = 1, 0
+g7.EX, g7.EY = 20, 0; run7(0.1); p = dot7(); check(p and abs(p[0]) < 0.02 and abs(p[1] - 0.5) < 0.02, 'camera turned to +x: enemy at +x is up %s' % (p and '%.2f,%.2f' % p[:2]))
+g7.EX, g7.EY = 0, 20; run7(0.1); p = dot7(); check(p and abs(p[0] + 0.5) < 0.02 and abs(p[1]) < 0.02, 'camera turned to +x: enemy at +y is left %s' % (p and '%.2f,%.2f' % p[:2]))
+g7.FWDX, g7.FWDY = 0, 1
+# beyond range: on the rim, faded
+g7.EX, g7.EY = 0, -50; run7(0.1); p = dot7()
+check(p and abs(p[1] + 1) < 0.02 and p[3] < 240 * 0.5, 'beyond range (50 m of 40) -> on the rim, faded (alpha %.0f)' % (p[3] if p else -1))
+# sensitivity 2: 50 m is inside an 80 m range
+r7.execute('HUD_CFG.sensitivity = 2.0'); run7(0.1); p = dot7()
+check(p and abs(p[1] + 50 / 80) < 0.02 and p[3] >= 239, 'sensitivity 2: 50 m sits at 50/80 of the radius %s' % (p and '%.3f' % p[1]))
+r7.execute('HUD_CFG.sensitivity = 1.0')
+# dot sizes: small 6, medium 10, large 16 screen px (gui = px / 1.2 wide) at 1440 tall: x 1440/1080
+for name, px in (('small', 6), ('medium', 10), ('large', 16)):
+    r7.execute('HUD_CFG.dot_size = "%s"' % name); g7.EX, g7.EY = 0, 10; run7(0.05); p = dot7()
+    want = math.floor(px * 1440 / 1080 * 1.6 / 1.2)   # (the stub enemy is a Charger, a heavy: size class large, 1.6x; box() floors)
+    check(p and p[2] == want, 'dot_size %s = %d px x1.6 (large class, Charger) (gui w %.0f, want %d)' % (name, px, p[2] if p else -1, want))
+r7.execute('HUD_CFG.dot_size = "medium"')
+# lost: lingers for the hold, then fades, then goes
+g7.EX, g7.EY = 0, -20; run7(0.5); g7.EALIVE = False; run7(0.1); p = dot7()
+check(p is not None and abs(p[1] + 0.5) < 0.02 and p[3] < 200, 'killed: a short fade where it fell (alpha %.0f)' % (p[3] if p else -1))
+run7(0.3); check(dot7() is None, 'killed: gone within 0.4 s (no repeat_rate hold for the dead)')
+# lost from tracking (ran out past range + 15 m): lingers for the hold, then fades
+g7.EALIVE = True; g7.EX, g7.EY = 0, -20; run7(1.0); g7.EX, g7.EY = 0, -80; run7(0.5); p = ghost7()
+check(p is not None and abs(p[1] + 0.5) < 0.02, 'lost from tracking: lingers at its last spot')
+run7(1.6); p = ghost7(); check(p is not None and p[3] < 200, 'then fades (alpha %.0f)' % (p[3] if p else -1))
+run7(1.0); check(ghost7() is None, 'gone after hold + fade (2.5 s)')
+g7.EX, g7.EY = 0, -20; run7(1.0); r7.execute('HUD_CFG.repeat_rate = 2.0'); g7.EX, g7.EY = 0, -80; run7(1.0); check(ghost7() is not None, 'rate 2: still there at 1.0 s')
+run7(0.4); check(ghost7() is None, 'rate 2: gone by 1.4 s (hold 0.5 + fade 0.75)')
+r7.execute('HUD_CFG.repeat_rate = 1.0')
+check(I7.rects <= 300, 'radar rects per frame %d (<= 300)' % I7.rects)
+# texture path: the engine answers -> drawn with Gui.bitmap, no rim dots
+EXTRA = '''
+BITMAPS = 0
+Application.can_get = function(kind, id) return (kind == "material" and id == "e2d6ed90906c1e8b") or (kind == "texture" and id == "03c798e2775e07a4") end
+Gui.material = function(g, id) return {mat = id} end
+Material = {set_texture = function(m, slot, tex) SET = {slot, tex} end}
+Gui.bitmap = function(g, mat, p, sz, c) BITMAPS = BITMAPS + 1 end'''
+r8 = radar_rt(EXTRA); u8 = r8.eval('update')
+for _ in range(220): u8(0.016)
+I8 = r8.globals().REAR_HEAT_HUD_RADAR
+check(I8.style == 'texture' and r8.eval('BITMAPS') > 50 and r8.eval('SET[2]') == '03c798e2775e07a4' and I8.rects < 10, 'texture path: Gui.bitmap draws the disc (%s, %d bitmaps, %d rects)' % (I8.style, r8.eval('BITMAPS'), I8.rects))
+lg8 = open(LOGDIR + '/rear_heat_hud.log').read()
+check('radar: texture bitmap draw succeeded' in lg8, 'texture success logged')
+r9 = radar_rt(EXTRA + '\nGui.bitmap = function() error("refused") end'); u9 = r9.eval('update')
+for _ in range(220): u9(0.016)
+I9 = r9.globals().REAR_HEAT_HUD_RADAR
+lg9 = open(LOGDIR + '/rear_heat_hud.log').read()
+check(I9.style == 'dots' and I9.rects > 100 and 'radar: texture bitmap draw failed: ' in lg9, 'bitmap refused -> rect dots, logged')
+r10 = radar_rt(EXTRA + '\nHUD_CFG.radar_style = "dots"'); u10 = r10.eval('update')
+for _ in range(220): u10(0.016)
+check(r10.globals().REAR_HEAT_HUD_RADAR.style == 'dots' and r10.eval('BITMAPS') == 0, 'radar_style=dots never tries the texture')
+# dot_size slider: 3 snaps, saved
+r11 = radar_rt(); r11.execute('HUD_CFG.calibrate = true'); u11 = r11.eval('update'); g11 = r11.globals()
+open(INI, 'a').write('calibrate=true\n')
+r11 = radar_rt(); u11 = r11.eval('update'); g11 = r11.globals()
+def run11(sec):
+    for _ in range(max(1, int(sec / 0.016))): u11(0.016)
+run11(3.5)
+C11 = g11.HUD_CFG
+tx, ty, tw, th = r11.eval('function(i) return REAR_HEAT_HUD_SLIDER(i) end')(4)
+for frac, want in ((0.05, 'small'), (0.6, 'medium'), (0.95, 'large')):
+    g11.MX, g11.MY = to_window(tx + tw * 0.5, ty + th / 2); run11(0.02); g11.LMB = 1; run11(0.02)
+    g11.MX, g11.MY = to_window(tx + tw * frac, ty + th / 2); run11(0.05); g11.LMB = 0; run11(0.02)
+    check(C11.dot_size == want, 'dot_size slider at %.2f -> %s (%s)' % (frac, want, C11.dot_size))
+run11(1.0)
+ini11 = open(INI).read(); v11 = dict(re.findall(r'^(\w+)=(.*)$', ini11, re.M))
+check(v11.get('dot_size') == 'large' and v11.get('area_x1') == '2133.33' and v11.get('sensitivity') == '1.00' and v11.get('repeat_rate') == '1.00', 'dot_size saved; area, sensitivity and repeat_rate untouched')
+for k in (12, 13, 14, 15): r11.execute('PRESSED[%d] = true' % k); run11(0.02)
+check(C11.dot_size == 'large', 'no key changes dot_size')
+# ---------------------------------------------------------------- v1.3.1: round disc, labels
+open(INI, 'w').write('calibrate=true\nv110_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\narea_scale=1\nradar_fx=0.3\nradar_fy=0.6\n')
+EXTRA2 = EXTRA.replace('Gui.material = function(g, id) return {mat = id} end', 'TEXOF = {}\nGui.material = function(g, id) return g end').replace(
+  'Material = {set_texture = function(m, slot, tex) SET = {slot, tex} end}', 'Material = {set_texture = function(m, slot, tex) SET = {slot, tex}; TEXOF[m] = tex end}').replace(
+  'Gui.bitmap = function(g, mat, p, sz, c) BITMAPS = BITMAPS + 1 end',
+  'BM = {}\nGui.bitmap = function(g, mat, p, sz, c) BITMAPS = BITMAPS + 1; BM[TEXOF[g]] = {p[1], p[2], sz[1], sz[2]} end').replace(
+  '(kind == "texture" and id == "03c798e2775e07a4")', '(kind == "texture")')
+r12 = radar_rt(EXTRA2); u12 = r12.eval('update'); g12 = r12.globals()
+for _ in range(260): u12(0.016)
+I12 = g12.REAR_HEAT_HUD_RADAR; bm = tuple(g12.BM['03c798e2775e07a4'].values())
+check(bm is not None and abs(bm[2] / bm[3] - 1.25) < 1e-6, 'disc bitmap 1.25x wider than tall in screen px by default (%.1f x %.1f)' % (bm[2], bm[3]))
+rpx = I12.ry * 0.9333
+check(abs(bm[3] - 2 * rpx / (250 / 256)) < 0.5 and abs(bm[2] - 2 * I12.rx * 1.2 / (250 / 256)) < 0.5, 'disc rim = the overlay ellipse on both axes (w %.1f, overlay %.1f)' % (bm[2], 2 * I12.rx * 1.2 / (250 / 256)))
+# the disc's centre (bottom-left + half its px size mapped back to gui units) is the radar centre
+check(abs(bm[0] + bm[2] / 2 / 1.2 - I12.cx) < 0.01 and abs(bm[1] + bm[3] / 2 / 0.9333 - I12.cy) < 0.01, 'disc centred on the overlay')
+check(abs(I12.cx - 0.3 * 2133.33) < 0.1, 'the user placement keys are respected (radar_fx 0.3)')
+L12 = g12.REAR_HEAT_HUD_LABELS
+check(all(L12[k] == 'texture' for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')), 'slider labels drawn as word textures %s' % dict(L12))
+lg12 = open(LOGDIR + '/rear_heat_hud.log').read()
+check('bitmap label sensitivity: draw succeeded' in lg12, 'label bitmap result logged')
+# trim: radar_aspect 1.2 widens disc and overlay together
+r12.execute('local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end; find(find(update, "step"), "CFG").radar_aspect = 1.2')
+for _ in range(3): u12(0.016)
+bm = tuple(g12.BM['03c798e2775e07a4'].values())
+check(abs(bm[2] / bm[3] - 1.2) < 1e-6 and abs(I12.rx * 1.2 / (I12.ry * 0.9333) - 1.2) < 1e-6, 'radar_aspect 1.2 trims disc and overlay alike')
+# labels refused -> pixel font (rects), disc still a texture
+r13 = radar_rt(EXTRA2.replace('Gui.bitmap = function(g, mat, p, sz, c)', 'Gui.bitmap = function(g, mat, p, sz, c) if TEXOF[g] ~= "03c798e2775e07a4" then error("no") end'))
+u13 = r13.eval('update'); g13 = r13.globals()
+for _ in range(260): u13(0.016)
+L13 = g13.REAR_HEAT_HUD_LABELS
+check(all(L13[k] == 'pixel' for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')) and g13.REAR_HEAT_HUD_RADAR.style == 'texture', 'label textures refused -> pixel font labels; the disc stays a texture')
+lg13 = open(LOGDIR + '/rear_heat_hud.log').read()
+check('error' not in lg13.lower().replace('last error nil', ''), 'no errors in the log')
+# calibrate off: no labels, no slider drawing
+r14 = radar_rt(EXTRA2); r14.execute('BMCOUNT = 0'); u14 = r14.eval('update')
+open(INI, 'w').write('calibrate=false\nv110_migrated=true\n')
+r14 = radar_rt(EXTRA2); u14 = r14.eval('update')
+for _ in range(260): u14(0.016)
+check(len(list(r14.globals().REAR_HEAT_HUD_LABELS.keys())) == 0 and list(r14.globals().BM.keys()) == ['03c798e2775e07a4'], 'calibrate off: only the disc bitmap, no labels')
+# pixel font sanity: every glyph is 35 cells
+
+# ---------------------------------------------------------------- v1.3.2: pods, fallers, persistence, death, sizes, aspect migration
+open(INI, 'w').write('calibrate=false\nv110_migrated=true\nrange=40\narea_x0=10\narea_y0=20\narea_x1=900\narea_y1=700\narea_scale=1\nsensitivity=1.00\nrepeat_rate=1.00\nradar_fx=0.4\nradar_fy=0.7\nradar_size=0.3\nradar_aspect=1.0\nignore_ids=3828e2051aa9e897\n')
+EXTRA32 = """
+POD, STR, FALL, CAND, IGN, VOT, HARV = {}, {}, {}, {}, {}, {}, {}
+P = { [enemy] = {0, -20, 0}, [POD] = {3, -15, 0}, [STR] = {-10, -10, 30}, [FALL] = {10, -10, 40}, [CAND] = {-15, -5, 0},
+      [IGN] = {12, 5, 0}, [VOT] = {-5, 15, 0}, [HARV] = {5, 25, 0} }
+NM = { [enemy] = "1a7fcdff98c664b0", [POD] = "583ecde0d7718126", [STR] = "19e18b46ec55d94a", [FALL] = "1a7fcdff98c664b0",
+       [CAND] = "aabbccddeeff0011", [IGN] = "3828e2051aa9e897", [VOT] = "78e1497571012c47", [HARV] = "965eae5a51acdd4a" }
+BYID = {}; for u, h in pairs(NM) do BYID[h] = BYID[h] or {}; table.insert(BYID[h], u) end
+ALIVE, ASM, STATE = {}, {}, {}
+World.units = function() local r = {cam, rt}; for u in pairs(NM) do r[#r + 1] = u end return r end
+World.units_by_resource = function(w, id) return BYID[id] or {} end
+Unit.resource_name = function(u) local h = NM[u] or (u == cam and "aaaaaaaaaaaaaaaa") or (u == rt and "46cab355bd8d4d37") or "1234567890abcdef"
+  return setmetatable({}, {__tostring = function() return "#ID[" .. h .. "]" end}) end
+Unit.alive = function(u) return ALIVE[u] ~= false end
+Unit.has_animation_state_machine = function(u) if u == cam then return false end return ASM[u] ~= false end
+Unit.animation_get_state = function(u) return STATE[u] or 5, 0, 0, 0 end
+FR = 0
+Unit.world_position = function(u) if u == rt then error("CRASH") end
+  local p = P[u]; if not p then return stingray.Vector3(500, 500, 0) end
+  if u == CAND and CFROZEN then return stingray.Vector3(p[1], p[2], p[3]) end
+  return stingray.Vector3(p[1] + 0.1 * math.sin(FR * 0.7), p[2], p[3]) end
+"""
+r32 = radar_rt(EXTRA32); u32 = r32.eval('update'); g32 = r32.globals()
+def run32(sec, fall=True):
+    for _ in range(max(1, int(sec / 0.016))):
+        r32.execute('FR = FR + 1; if P[CAND] then P[CAND][1] = CSTEP and (P[CAND][1] + CSTEP) or (-15 + (FR % 3) * 1.5) end; P[STR][3] = P[STR][3] - 0.4; P[FALL][3] = P[FALL][3] - 0.4' if fall else 'FR = FR + 1; if P[CAND] then P[CAND][1] = CSTEP and (P[CAND][1] + CSTEP) or (-15 + (FR % 3) * 1.5) end')
+        u32(0.016)
+def ent(name):
+    u = g32[name]; return g32.HUD_S.T[u]
+while g32.HUD_S.px is None or g32.HUD_S.t < (g32.HUD_S.settle_until or 0): run32(0.1, fall=False)   # (settle after the world change)
+for _ in range(400):
+    run32(0.016)
+    if ent('CAND') is not None: break
+r32.execute('CSTEP = 0.03'); run32(0.2); c = ent('CAND'); check(c is not None and not c.show, 'candidate: tracked but not shown before 0.5 s')
+r32.execute('P[STR][3], P[FALL][3] = 30, 40'); run32(0.4)
+check(ent('POD') is None, 'Hellpod 583ecde0d7718126 never tracked')
+check(ent('IGN') is None, 'ini ignore_ids (3828e2051aa9e897) never tracked')
+check(ent('CAND') is not None and ent('CAND').show, 'candidate shown after 0.5 s')
+check(ent('FALL') is not None and not ent('FALL').show, 'a fast-falling non-flyer (25 m/s, no horizontal move) is hidden')
+check(ent('STR') is not None and ent('STR').show, 'a diving Stingray (flyer) stays shown')
+run32(2.5, fall=False)
+check(ent('FALL').show, 'the faller shows again 2 s after it landed')
+for nm, want in (('VOT', 'tiny'), ('enemy', 'large'), ('HARV', 'xlarge'), ('CAND', 'medium'), ('STR', 'medium')):
+    check(ent(nm).size == want, 'size class %s -> %s (%s)' % (nm, want, ent(nm).size))
+lg32 = open(LOGDIR + '/rear_heat_hud.log').read()
+check('size: aabbccddeeff0011' in lg32 and 'not in the size map' in lg32, 'unknown kind logged with its size class')
+# dot sizes: a Harvester's dot is 2.2/0.6 of a Voteless's
+r32.execute('DOTS = {}'); run32(0.02, fall=False)
+I32 = g32.REAR_HEAT_HUD_RADAR
+def dot_at(x, y):
+    for d in g32.DOTS.values():
+        if abs(d[1] - (I32.cx + x / 40 * I32.rx)) < 3 and abs(d[2] - (I32.cy + y / 40 * I32.ry)) < 3: return d
+r32.execute('DOTS = {}'); u32(0.016)
+dv, dh = dot_at(-5, 15), dot_at(5, 25)
+check(dv is not None and dh is not None and dh[3] / dv[3] > 3.0, 'Harvester dot much bigger than a Voteless dot (%s / %s)' % (dh and dh[3], dv and dv[3]))
+# death by animation state (Voteless state 31): gone within ~0.4 s, no hold
+r32.execute('STATE[VOT] = 31'); run32(0.05, fall=False)
+check(not ent('VOT').show, 'Voteless in its death state (31) hidden at once')
+run32(0.4, fall=False); r32.execute('DOTS = {}'); u32(0.016)
+check(dot_at(-5, 15) is None, 'dead Voteless cleared within 0.5 s')
+# death by state machine loss (and learning): the Harvester
+r32.execute('ASM[HARV] = false'); run32(0.4, fall=False); r32.execute('DOTS = {}'); u32(0.016)
+check(dot_at(5, 25) is None and ent('HARV') is None, 'state machine gone -> cleared within 0.4 s')
+# stillness: the candidate stops (no jitter, no state change) -> hidden after still_hide 1 s, then shows again when it moves
+r32.execute('CSTEP = 0; CFROZEN = true')
+run32(1.3, fall=False)
+check(ent('CAND') is not None and not ent('CAND').show, 'a body that stays still (no move, same state) is hidden after 1 s (%s)' % (ent('CAND') and ent('CAND').still))
+r32.execute('P[CAND][1] = P[CAND][1] + 1'); run32(0.05, fall=False)
+check(ent('CAND').show, 'it shows again once it moves')
+# aspect migration: 1.0 -> 1.25 once; placement keys untouched
+ini = open(INI).read()
+check('radar_aspect=1.25' in ini and 'v132_migrated=true' in ini, 'ini radar_aspect 1.0 migrated to 1.25 once')
+check(all(k in ini for k in ('area_x0=10', 'area_y0=20', 'area_x1=900', 'area_y1=700', 'radar_fx=0.4', 'radar_fy=0.7', 'radar_size=0.3', 'sensitivity=1.00', 'repeat_rate=1.00')), 'placement, sensitivity and repeat_rate keys untouched')
+open(INI, 'w').write(ini.replace('radar_aspect=1.25', 'radar_aspect=1.0'))
+r33 = radar_rt(); u33 = r33.eval('update')
+for _ in range(5): u33(0.016)
+check('radar_aspect=1.0' in open(INI).read(), 'migration runs only once (a later 1.0 stays)')
+print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
+if fails: raise SystemExit(1)
