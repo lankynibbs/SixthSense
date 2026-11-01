@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.4 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.4.5 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -357,3 +357,10 @@ where the camera looks.
   hud mode probes for the game's HUD state (game globals, then Application.user_setting keys such as hud_visible)
   and logs what it finds as `visibility:` lines in sixth_sense.log; if nothing answers, hud acts as always.
   The default is always, because HUD detection is not confirmed on this build yet.
+
+## v1.4.5 changes
+
+- HUD mode is gone (the game's HUD toggle could not be read), with its probing code and log lines.
+- Visibility is now a choice: Shown / Hidden buttons (the chosen one lit) under the sliders on the F7 page's
+  Settings tab, mouse only. Saved as `visibility=shown|hidden` (default shown). The F7 page always shows the radar.
+- A saved `visibility=hud` or `always` becomes `shown` once (v145_migrated).

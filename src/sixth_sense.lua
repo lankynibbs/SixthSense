@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.4.4 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.4.5 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.4.4"
+local MOD, VERSION = "sixth_sense", "1.4.5"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -83,7 +83,7 @@ local function say(s)
 end
 
 -- ---------------------------------------------------------------- config
-local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, visibility = "always", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
+local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, v145_migrated = false, visibility = "shown", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
               detect = "both", discovery = true, discovery_static = false, discovery_range = 80, candidate_weight = 1.5,
               debug = false }
 local CFG_TEXT = [[
@@ -144,11 +144,11 @@ radar_style=auto
 ; reset to medium once, so everyone sees the bigger v1.4.4 dots.)
 dot_size=medium
 v144_migrated=true
-; visibility (v1.4.4): when the radar shows. hidden = never (the F7 calibration page still shows it so you can set
-; it up), always = all the time, hud = only while the game's own HUD is shown (follows the HUD toggle). hud needs the
-; game's HUD state; if it cannot be read, hud acts as always (sixth_sense.log says "visibility:" what was found).
-; Green 3-way slider on the F7 page's Settings tab (mouse only).
-visibility=always
+; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
+; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
+; hud and always became shown once.)
+visibility=shown
+v145_migrated=true
 ; radar_aspect (0.5-2, default 1.25 since v1.3.2: v1.3.1 measured about 25% too narrow): the radar's width trim,
 ; disc and dots together.
 radar_aspect=1.25
@@ -189,10 +189,9 @@ discovery_range=80
 candidate_weight=1.5
 debug=false
 ]]
-local VIS_COMMENT = [[; visibility (v1.4.4): when the radar shows. hidden = never (the F7 calibration page still shows it so you can set
-; it up), always = all the time, hud = only while the game's own HUD is shown (follows the HUD toggle). hud needs the
-; game's HUD state; if it cannot be read, hud acts as always (sixth_sense.log says "visibility:" what was found).
-; Green 3-way slider on the F7 page's Settings tab (mouse only).]]
+local VIS_COMMENT = [[; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
+; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
+; hud and always became shown once.)]]
 local function clamp(v, a, b) if v < a then return a elseif v > b then return b end return v end
 local cfg_state
 local cfg_copied = nil
@@ -229,7 +228,7 @@ do
   CFG.label_style = tostring(CFG.label_style):lower(); if CFG.label_style ~= "texture" and CFG.label_style ~= "pixel" and CFG.label_style ~= "off" then CFG.label_style = "auto" end
   CFG.radar_fx = clamp(CFG.radar_fx, 0, 1); CFG.radar_fy = clamp(CFG.radar_fy, 0, 1)
   CFG.radar_style = tostring(CFG.radar_style):lower(); if CFG.radar_style ~= "texture" and CFG.radar_style ~= "dots" then CFG.radar_style = "auto" end
-  CFG.visibility = tostring(CFG.visibility):lower(); if CFG.visibility ~= "hidden" and CFG.visibility ~= "hud" then CFG.visibility = "always" end
+  CFG.visibility = tostring(CFG.visibility):lower(); if CFG.visibility ~= "hidden" and CFG.visibility ~= "hud" then CFG.visibility = "shown" end   -- (hud: migrated below)
   CFG.dot_size = tostring(CFG.dot_size):lower(); if CFG.dot_size ~= "small" and CFG.dot_size ~= "large" then CFG.dot_size = "medium" end
   if CFG.sx_scale <= 0 then CFG.sx_scale = 1.2 end; if CFG.sy_scale <= 0 then CFG.sy_scale = 0.9333 end
   CFG.discovery_range = clamp(CFG.discovery_range, 10, 300); CFG.candidate_weight = clamp(CFG.candidate_weight, 0, 10)
@@ -1124,9 +1123,17 @@ local function cal_init(sw, sh)
     local old = CFG.dot_size
     if old == "small" then CFG.dot_size = "medium" end
     CFG.v144_migrated = true
-    if ini_save({ dot_size = CFG.dot_size, v144_migrated = "true", visibility = CFG.visibility, __order = { "dot_size", "v144_migrated", "visibility" },
-                  __comment = { visibility = VIS_COMMENT } }) then
+    if ini_save({ dot_size = CFG.dot_size, v144_migrated = "true", __order = { "dot_size", "v144_migrated" },
+                  }) then
       say(string.format("ini: v1.4.4 migration once (dot_size %s -> %s, base dots 12/24/44/58 px)", old, CFG.dot_size))
+    end
+  end
+  if not CFG.v145_migrated or CFG.visibility == "hud" then   -- v1.4.5: HUD mode dropped; hud / always -> shown, once
+    local old = CFG.visibility
+    if old ~= "hidden" then CFG.visibility = "shown" end
+    CFG.v145_migrated = true
+    if ini_save({ visibility = CFG.visibility, v145_migrated = "true", __order = { "visibility", "v145_migrated" }, __comment = { visibility = VIS_COMMENT } }) then
+      say(string.format("ini: v1.4.5 migration once (visibility %s -> %s)", old, CFG.visibility))
     end
   end
   if not CFG.v110_migrated then                     -- v1.1: bar_debug off once in an older ini (nothing else touched)
@@ -1166,7 +1173,6 @@ end
 -- the sliders, in gui units: stacked under the area's top edge, a fixed size so they stay usable at any scale.
 -- 1 scale (cyan), 2 sensitivity (orange), 3 repeat_rate (magenta): yellow tick at 1.0; 4 dot_size (red): 3 snap positions, tick at medium.
 local DOT_IDX_, DOT_NAMES_ = { small = 1, medium = 2, large = 3 }, { "small", "medium", "large" }
-local VIS_IDX_, VIS_NAMES_ = { hidden = 1, always = 2, hud = 3 }, { "hidden", "always", "hud" }
 local SL = {
   { name = "scale", min = SMIN, max = SMAX, tick = D_DEF, rgb = { 0, 200, 255 }, get = function() return cal_scale() end, set = function(v) set_scale(v) end },
   { name = "sensitivity", min = 0.25, max = 3, rgb = { 255, 140, 0 }, get = function() return CFG.sensitivity end,
@@ -1175,9 +1181,6 @@ local SL = {
     set = function(v) CFG.repeat_rate = clamp(v, 0.25, 3); CAL.dirty = true end },
   { name = "dot_size", min = 1, max = 3, tick = 2, rgb = { 255, 50, 50 }, get = function() return DOT_IDX_[CFG.dot_size] or 2 end,
     set = function(v) local n = DOT_NAMES_[clamp(math.floor(v + 0.5), 1, 3)]; if n ~= CFG.dot_size then CFG.dot_size = n; CAL.dirty = true end end },
-  -- v1.4.4: 5 visibility (green): hidden / always / hud, 3 snap positions, tick at always
-  { name = "visibility", min = 1, max = 3, tick = 2, rgb = { 40, 230, 90 }, get = function() return VIS_IDX_[CFG.visibility] or 2 end,
-    set = function(v) local n = VIS_NAMES_[clamp(math.floor(v + 0.5), 1, 3)]; if n ~= CFG.visibility then CFG.visibility = n; CAL.dirty = true; say("visibility: set to " .. n) end end },
 }
 local function slider_rect(i)
   i = i or 1
@@ -1189,9 +1192,17 @@ local function slider_rect(i)
   local top = vtop - (CAL.pfy or CFG.panel_fy) * CAL.bh - 80 / CFG.sy_scale     -- (below the tab buttons)
   -- (the whole stack and its values kept on the visible screen)
   tx = clamp(tx, 150 / CFG.sx_scale, vw - w - 140 / CFG.sx_scale)
-  top = clamp(top, math.max(vbot, 0) + h + (#SL - 1) * sp + 40 / CFG.sy_scale, vtop - 20 / CFG.sy_scale)
+  top = clamp(top, math.max(vbot, 0) + h + #SL * sp + 40 / CFG.sy_scale, vtop - 20 / CFG.sy_scale)
   return tx, top - h - (i - 1) * sp, w, h
 end
+-- v1.4.5: the Shown / Hidden buttons (radio style, the chosen one lit), one row under the last slider, 200 x 48 px
+local VIS_BTN = { { id = "shown", label = "vis_shown" }, { id = "hidden", label = "vis_hidden" } }
+local function vis_rect(i)
+  local tx, ty = slider_rect(#SL)
+  local w, h = 200 / CFG.sx_scale, 48 / CFG.sy_scale
+  return tx + (i - 1) * (w + 12 / CFG.sx_scale), ty - 50 / CFG.sy_scale - h / 2 + 8 / CFG.sy_scale, w, h
+end
+_G.SIXTH_SENSE_VIS = vis_rect                     -- (read by the stub test)
 _G.SIXTH_SENSE_SLIDER = slider_rect               -- (read by the stub test)
 local function knob_x(tx, tw, i)
   local d = SL[i or 1]
@@ -1219,6 +1230,10 @@ local function panel_box()
     local tx, ty, tw, th = slider_rect(i)
     x0 = math.min(x0, tx - 150 / CFG.sx_scale); x1 = math.max(x1, tx + tw + 140 / CFG.sx_scale)
     y0 = math.min(y0, ty - 12 / CFG.sy_scale); y1 = math.max(y1, ty + th + 12 / CFG.sy_scale)
+  end
+  for i = 1, #VIS_BTN do
+    local x, y, w, h = vis_rect(i)
+    x0 = math.min(x0, x - 150 / CFG.sx_scale); x1 = math.max(x1, x + w); y0 = math.min(y0, y - 12 / CFG.sy_scale)
   end
   return x0, y0, x1, y1
 end
@@ -1259,7 +1274,7 @@ local function reset_click(sw, sh)
   if CAL.armed and S.t < CAL.armed then
     CAL.armed = nil
     if CAL.tab == "settings" then
-      CFG.sensitivity, CFG.repeat_rate, CFG.dot_size, CFG.visibility = 1.0, 1.0, "medium", "always"; set_scale(D_DEF)
+      CFG.sensitivity, CFG.repeat_rate, CFG.dot_size, CFG.visibility = 1.0, 1.0, "medium", "shown"; set_scale(D_DEF)
       say("reset (Settings, confirmed): size, sensitivity, repeat_rate, dot_size and visibility back to their defaults")
     else reset_pos("Display, confirmed") end
     cal_save("reset", sw, sh); panel_place("reset")
@@ -1296,6 +1311,14 @@ local function cal_input(sw, sh, gx, gy)
     if not CAL.drag then
       local x, y, w, h = tab_rect(3)
       if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; reset_click(sw, sh) end
+    end
+    for i = 1, (CAL.drag or disp) and 0 or #VIS_BTN do          -- v1.4.5: Shown / Hidden (a click picks one)
+      local x, y, w, h = vis_rect(i)
+      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
+        CAL.drag = "tab"
+        if CFG.visibility ~= VIS_BTN[i].id then CFG.visibility = VIS_BTN[i].id; CAL.dirty = true; say("visibility: " .. CFG.visibility) end
+        break
+      end
     end
     for i = 1, (CAL.drag or disp) and 0 or #SL do
       local tx, ty, tw, th = slider_rect(i)
@@ -1476,8 +1499,10 @@ local LABEL_TEX = {
   repeat_rate = { 'ae02fd6005683294', 196, 48 },
   dot_size = { '8024c7d02d7bd868', 136, 48 },
   visibility = { '9f6f6ca838a05cdf', 152, 48 },
+  vis_shown = { 'ebe63964e4089a54', 120, 48 },
+  vis_hidden = { '5d673ce754dcc40d', 128, 48 },
 }
-local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", visibility = "VISIBILITY" }
+local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
 local GLYPH = {
   ["0"] = "01110100011001110101110011000101110", ["1"] = "00100011000010000100001000010001110",
   ["2"] = "01110100010000100010001000100011111", ["3"] = "11110000010000101110000010000111110",
@@ -1540,100 +1565,12 @@ local function draw_label(gbox, key, x, cy, k)
   LABELS.how[key] = "pixel"
 end
 local function slider_value(i)
-  if i == 5 then return ({ "HIDDEN", "ALWAYS", "HUD" })[VIS_IDX_[CFG.visibility] or 2] end
   if i == 4 then return ({ "S", "M", "L" })[DOT_IDX[CFG.dot_size] or 2] end
   local d = SL[i]
   return string.format("%.2fx", d.get())
 end
--- ---------------------------------------------------------------- visibility (v1.4.4)
--- hidden: never (but the F7 page shows the radar); always; hud: only while the game's HUD is shown. No Bingus or
--- engine call is known to give the HUD toggle in build 25480438, so this probes the best candidates (game globals a
--- HUD toggle would live in, then the game's settings through Application.user_setting) every 5 s until one gives an
--- answer, logs each result once ("visibility: probe ..."), then reads the first that answered 4 times a second and
--- logs every change. If none answers, hud acts as always (logged once).
-local HUDV = { src = nil, next = 0, logged = {}, last = nil, fallback_logged = false, read_at = 0, val = nil }
-_G.SIXTH_SENSE_HUDV = HUDV                          -- (read by the stub test)
-local function hud_interp(v)
-  local t = type(v)
-  if t == "boolean" then return v end
-  if t == "number" then return v ~= 0 end
-  if t == "string" then
-    local l = v:lower()
-    if l == "off" or l == "hidden" or l == "hide" or l == "false" or l == "none" or l == "0" or l == "disabled" then return false end
-    if l == "on" or l == "shown" or l == "show" or l == "true" or l == "visible" or l == "always" or l == "1" or l == "enabled" or l == "dynamic" then return true end
-  end
-  return nil
-end
-local function hud_field(t)                         -- a table that might hold the HUD's shown state
-  if type(t) ~= "table" then return nil end
-  for _, m in ipairs({ "is_visible", "visible", "hud_visible", "is_hud_visible", "is_shown", "shown", "enabled", "is_enabled" }) do
-    local v = rawget(t, m)
-    if type(v) == "function" then local ok, r = pcall(v, t); if ok and hud_interp(r) ~= nil then return r end
-    elseif hud_interp(v) ~= nil then return v end
-  end
-  return nil
-end
-local HUD_SETTINGS = { "hud_visible", "show_hud", "hud_enabled", "hud_visibility", "hud_mode", "hud", "toggle_hud", "hide_hud" }
-local HUD_CANDS = {}
-for _, g in ipairs({ "HUD_VISIBLE", "hud_visible", "SHOW_HUD", "show_hud" }) do
-  HUD_CANDS[#HUD_CANDS + 1] = { name = "global " .. g, get = function() return rawget(_G, g) end }
-end
-HUD_CANDS[#HUD_CANDS + 1] = { name = "Managers.state.hud / ui / hud_manager", get = function()
-  local M = rawget(_G, "Managers"); if type(M) ~= "table" then return nil end
-  local st = rawget(M, "state")
-  for _, t in ipairs({ type(st) == "table" and rawget(st, "hud") or nil, type(st) == "table" and rawget(st, "ui") or nil, rawget(M, "hud"), rawget(M, "ui"), rawget(M, "hud_manager") }) do
-    local v = hud_field(t); if v ~= nil then return v end
-  end
-  return nil
-end }
-for _, key in ipairs(HUD_SETTINGS) do
-  HUD_CANDS[#HUD_CANDS + 1] = { name = "Application.user_setting " .. key, invert = (key == "hide_hud"), get = function()
-    local A = ns("Application"); local f = A and A.user_setting   -- (looked up each probe, not cached)
-    if type(f) ~= "function" then return nil end
-    return f(key)
-  end }
-end
-local function hud_read(c)
-  local ok, v = pcall(c.get)
-  if not ok then return nil, "error " .. tostring(v) end
-  local b = hud_interp(v)
-  if b ~= nil and c.invert then b = not b end
-  return b, tostring(v)
-end
-local function hud_shown()                          -- true / false, or nil: unknown
-  if HUDV.src then
-    if S.t < HUDV.read_at then return HUDV.val end
-    HUDV.read_at = S.t + 0.25
-    local b, raw = hud_read(HUDV.src)
-    if b == nil then say("visibility: " .. HUDV.src.name .. " stopped answering (" .. tostring(raw) .. "), probing again"); HUDV.src, HUDV.val = nil, nil; return nil end
-    if b ~= HUDV.val then say(string.format("visibility: game HUD %s (%s = %s)", b and "shown" or "hidden", HUDV.src.name, raw)) end
-    HUDV.val = b
-    return b
-  end
-  if S.t < HUDV.next then return nil end
-  HUDV.next = S.t + 5
-  for _, c in ipairs(HUD_CANDS) do
-    local b, raw = hud_read(c)
-    if not HUDV.logged[c.name] then HUDV.logged[c.name] = true; say(string.format("visibility: probe %s -> %s%s", c.name, tostring(raw), b == nil and " (no answer)" or (" = HUD " .. (b and "shown" or "hidden")))) end
-    if b ~= nil then
-      HUDV.src, HUDV.val, HUDV.read_at = c, b, S.t + 0.25
-      say(string.format("visibility: HUD state source %s (HUD %s now)", c.name, b and "shown" or "hidden"))
-      return b
-    end
-  end
-  return nil
-end
-local function radar_visible()
-  local v = CFG.visibility
-  if v == "hidden" then return false end
-  if v ~= "hud" then return true end
-  local b = hud_shown()
-  if b == nil then
-    if not HUDV.fallback_logged then HUDV.fallback_logged = true; say("visibility: hud mode, but no HUD state source answered: acting as always (re-probed every 5 s)") end
-    return true
-  end
-  return b
-end
+-- v1.4.5 visibility: shown or hidden (HUD mode was dropped: the game's HUD toggle could not be read)
+local function radar_visible() return CFG.visibility ~= "hidden" end
 RAD_RESET = function() for _, st in pairs(RAD.tex) do st.gui = nil end end   -- (the old world's GUI is dropped untouched)
 local function draw()
   if not S.gui then
@@ -1717,7 +1654,7 @@ local function draw()
       gbox(mx - 6 / SX, my + s * 14 / SY - 3 / SY, 12 / SX, 6 / SY, 255, 255, 255, 255)
     end
   end
-  -- the radar: replaces the bars (v1.3). v1.4.4: visibility (hidden / always / hud); the F7 page always shows it.
+  -- the radar: replaces the bars (v1.3). v1.4.5: visibility (shown / hidden); the F7 page always shows it.
   if CAL.on or radar_visible() then draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc) end
   -- v1.4.1: the panel last and on a higher layer (rects 990, labels 995), so the radar never covers it
   if CAL.on then
@@ -1747,6 +1684,18 @@ local function draw()
       draw_label(gbox, d.name == "scale" and "size" or d.name, tx - 16 / SX, ty + th / 2, k)
       pixel_text(gbox, slider_value(i), tx + tw + 18 / SX, ty + th / 2, 2 * k, "left", 240, d.rgb[1], d.rgb[2], d.rgb[3])
       gbox(one - 1 / SX, ty - 6 / SY, 2 / SX, th + 12 / SY, 230, 255, 255, 0)
+    end
+    do                                                                       -- v1.4.5: Shown / Hidden buttons
+      local x1_, y1_, w1_, h1_ = vis_rect(1)
+      draw_label(gbox, "visibility", x1_ - 16 / SX, y1_ + h1_ / 2, kk)
+      for i = 1, #VIS_BTN do
+        local x, y, w, h = vis_rect(i)
+        local on = CFG.visibility == VIS_BTN[i].id
+        gbox(x, y, w, h, on and 235 or 150, on and 0 or 40, on and 150 or 40, on and 200 or 50)
+        if on then gbox(x, y, w, 4 / SY, 255, 255, 255, 255) end
+        local lb = VIS_BTN[i].label
+        draw_label(gbox, lb, x + w / 2 + (LABEL_TEX[lb][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
+      end
     end
     end
     LAYER_NOW = 950
