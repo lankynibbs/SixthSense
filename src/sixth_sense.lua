@@ -1026,7 +1026,7 @@ local function cal_init(sw, sh)
     CAL.y0 = CFG.gy_top - CAL.bh
     say("area: none saved, starting from the sx_scale/sy_scale/gy_top transform (full screen)")
   end
-  CAL.on = CFG.calibrate
+  CAL.on = CFG.calibrate; CAL.tab = "display"
   if not CFG.v132_migrated then                     -- v1.3.2: radar_aspect 1.0 (the old default) -> 1.25, once
     local old = CFG.radar_aspect
     local f = io.open(CFG_PATH, "r"); local txt = f and f:read("*a") or ""; if f then f:close() end
@@ -1088,7 +1088,7 @@ local function slider_rect(i)
   -- area, so dragging moves only the radar. The labels sit left of the tracks (room for the widest, 140 px).
   local vw, vtop, vbot = CAL.bw, CFG.gy_top, CFG.gy_top - CAL.bh
   local tx = CFG.panel_fx * vw + 150 / CFG.sx_scale
-  local top = vtop - CFG.panel_fy * CAL.bh
+  local top = vtop - CFG.panel_fy * CAL.bh - 80 / CFG.sy_scale     -- (below the tab buttons)
   -- (the whole stack and its values kept on the visible screen)
   tx = clamp(tx, 150 / CFG.sx_scale, vw - w - 140 / CFG.sx_scale)
   top = clamp(top, math.max(vbot, 0) + h + (#SL - 1) * sp + 40 / CFG.sy_scale, vtop - 20 / CFG.sy_scale)
@@ -1099,23 +1099,44 @@ local function knob_x(tx, tw, i)
   local d = SL[i or 1]
   return tx + tw * (d.get() - d.min) / (d.max - d.min)
 end
+-- v1.4.0 tabs, fixed at the panel position: 1 Display (the radar: drag, wheel, arrows), 2 Settings (the sliders; the
+-- radar shows as a preview and does not move). Buttons 200 x 48 screen px, 12 px apart.
+local TABS = { { id = "display", label = "tab_display" }, { id = "settings", label = "tab_settings" } }
+local function tab_rect(i)
+  local vw, vtop = CAL.bw, CFG.gy_top
+  local w, h = 200 / CFG.sx_scale, 48 / CFG.sy_scale
+  local x = clamp(CFG.panel_fx * vw, 0, vw - 2 * w - 12 / CFG.sx_scale)
+  local top = clamp(vtop - CFG.panel_fy * CAL.bh, h, vtop)
+  return x + (i - 1) * (w + 12 / CFG.sx_scale), top - h, w, h
+end
+_G.SIXTH_SENSE_TAB = function(i) if i then return tab_rect(i) end return CAL.tab end   -- (read by the stub test)
 -- one frame of calibration input (mx, my: the cursor in gui units)
 local function cal_input(sw, sh, gx, gy)
   local sh_ = kdown("shift")
   local step = (sh_ and 20 or 2)
+  local disp = CAL.tab ~= "settings"
+  if disp then
   if krep("left") then move_by(-step / CFG.sx_scale, 0) end
   if krep("right") then move_by(step / CFG.sx_scale, 0) end
   if krep("up") then move_by(0, step / CFG.sy_scale) end
   if krep("down") then move_by(0, -step / CFG.sy_scale) end
   if IN.wheel and IN.wheel ~= 0 then set_scale(cal_scale() * (1 + 0.02 * clamp(IN.wheel, -10, 10))) end
+  end
   if not gx then return end
   if IN.lmb and not CAL.was_lmb then           -- the button went down: what is under the cursor?
     CAL.drag = nil
-    for i = 1, #SL do
+    for i = 1, #TABS do
+      local x, y, w, h = tab_rect(i)
+      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
+        if CAL.tab ~= TABS[i].id then CAL.tab = TABS[i].id; say("calibration tab: " .. CAL.tab) end
+        CAL.drag = "tab"; break
+      end
+    end
+    for i = 1, (CAL.drag or disp) and 0 or #SL do
       local tx, ty, tw, th = slider_rect(i)
       if gx >= tx - 15 and gx <= tx + tw + 15 and gy >= ty - 12 and gy <= ty + th + 12 then CAL.drag = i; break end
     end
-    if not CAL.drag and gx >= CAL.x0 and gx <= CAL.x1 and gy >= CAL.y0 and gy <= CAL.y1 then CAL.drag = "move"; CAL.gx, CAL.gy = gx, gy end
+    if not CAL.drag and disp and gx >= CAL.x0 and gx <= CAL.x1 and gy >= CAL.y0 and gy <= CAL.y1 then CAL.drag = "move"; CAL.gx, CAL.gy = gx, gy end
   elseif not IN.lmb then CAL.drag = nil end
   CAL.was_lmb = IN.lmb
   if type(CAL.drag) == "number" then
@@ -1266,12 +1287,14 @@ end
 -- in v0.3 the performance HUD font drew white blocks and the game crashed in the ship transition; working mods on this
 -- game use a retained text GUI with the game's runtime font and its own material, which is a lot to get right blind.
 local LABEL_TEX = {
+  tab_display = { '9b2fd888f42b0c0e', 132, 48 },
+  tab_settings = { 'ad6b66f6687bfb85', 144, 48 },
   size = { '7c2ccf6a4c4cb0d5', 76, 48 },
   sensitivity = { '7a7091af0d8c0316', 180, 48 },
   repeat_rate = { 'ae02fd6005683294', 196, 48 },
   dot_size = { '8024c7d02d7bd868', 136, 48 },
 }
-local LABEL_WORD = { size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE" }
+local LABEL_WORD = { tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE" }
 local GLYPH = {
   ["0"] = "01110100011001110101110011000101110", ["1"] = "00100011000010000100001000010001110",
   ["2"] = "01110100010000100010001000100011111", ["3"] = "11110000010000101110000010000111110",
@@ -1362,7 +1385,7 @@ local function draw()
   -- toggle_key (f7): calibration on/off (saved both ways)
   if kpressed("toggle") then
     CAL.on = not CAL.on
-    if not CAL.on then hold_give(); CAL.drag = nil end
+    if not CAL.on then hold_give(); CAL.drag = nil else CAL.tab = "display" end   -- (F7 opens on the Display tab)
     cal_save((CAL.on and "calibration on (" or "calibration off (") .. KEYNAMES.toggle[1] .. ")", sw, sh)
   end
   local function gbox(x, y, w, h, a, r, g, b) box(x, y, w, h, a, r, g, b) end
@@ -1378,6 +1401,17 @@ local function draw()
   local sc = aw / CAL.bw
   if CAL.on then
     local t1, t2 = 3 / SX, 3 / SY                                           -- 3 screen px lines
+    local kk = sh / 1080
+    for i = 1, #TABS do                                                      -- the tab buttons; the active one lit
+      local x, y, w, h = tab_rect(i)
+      local on = CAL.tab == TABS[i].id
+      gbox(x, y, w, h, on and 235 or 150, on and 0 or 40, on and 150 or 40, on and 200 or 50)
+      if on then gbox(x, y, w, 4 / SY, 255, 255, 255, 255) end
+      draw_label(gbox, TABS[i].label, x + w / 2 + (LABEL_TEX[TABS[i].label][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
+    end
+  end
+  if CAL.on and CAL.tab ~= "settings" then
+    local t1, t2 = 3 / SX, 3 / SY
     gbox(ax0, ay0, aw, ah, 45, 40, 120, 255)                                 -- the area, see-through blue
     gbox(ax0, ay1 - t2, aw, t2, 230, 255, 255, 255); gbox(ax0, ay0, aw, t2, 230, 255, 255, 255)
     gbox(ax0, ay0, t1, ah, 230, 255, 255, 255); gbox(ax1 - t1, ay0, t1, ah, 230, 255, 255, 255)
@@ -1388,6 +1422,8 @@ local function draw()
     gbox(ax1 - hw, ay0, hw, hh, 240, 255, 255, 0)                            -- bottom-right: yellow
     local cx, cy = ax0 + aw / 2, ay0 + ah / 2                                -- centre cross, 80 x 6 px
     gbox(cx - 40 / SX, cy - 3 / SY, 80 / SX, 6 / SY, 240, 255, 255, 255); gbox(cx - 3 / SX, cy - 40 / SY, 6 / SX, 80 / SY, 240, 255, 255, 255)
+  end
+  if CAL.on and CAL.tab == "settings" then
     for i = 1, #SL do                                                        -- the sliders: track, fill, knob, tick at 1.0
       local d = SL[i]
       local tx, ty, tw, th = slider_rect(i)

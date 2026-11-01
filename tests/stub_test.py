@@ -68,6 +68,11 @@ SW, SH, RW, RH, SX, SY, GT = 2560, 1440, 1920, 1080, 1.2, 0.9333, 1080
 def to_window(gx, gy):       # gui -> the cursor axis (window px, from the bottom, y up)
     px, py = gx * SX, (GT - gy) * SY
     return px * RW / SW, (SH - py) * RH / SH
+def click_tab(rr, i):
+    gg = rr.globals(); u = rr.eval('update')
+    x, y, w, h = rr.eval('function(i) return SIXTH_SENSE_TAB(i) end')(i)
+    gg.MX, gg.MY = to_window(x + w / 2, y + h / 2); u(0.016); gg.LMB = 1; u(0.016); gg.LMB = 0; u(0.016)
+def tab(rr): return rr.eval('SIXTH_SENSE_TAB()')
 def key(name): r.execute('PRESSED[%d] = true' % {'f7':1,'left':2,'right':3,'up':4,'down':5,'plus':8,'minus':10}[name]); frames(1)
 fails = []
 def check(ok, what): print(('PASS ' if ok else 'FAIL ') + what); (None if ok else fails.append(what))
@@ -94,12 +99,28 @@ s0 = scale(); key('plus'); key('minus'); check(abs(scale() - s0) < 1e-12, '+/- k
 x0 = area()[0]; key('left'); check(abs(area()[0] - (x0 - 2 / SX)) < 1e-6, 'left arrow nudged 2 px')
 r.execute('HELD[6] = true'); x0 = area()[0]; key('right'); check(abs(area()[0] - (x0 + 20 / SX)) < 1e-6, 'shift+right nudged 20 px'); r.execute('HELD = {}')
 y1 = area()[3]; key('up'); check(abs(area()[3] - (y1 + 2 / SY)) < 1e-6, 'up arrow moved the area up (gui y +)')
+# v1.4.0 tabs: F7 opens on Display; in Settings the radar can't be dragged or resized
+check(tab(r) == 'display', 'calibration opens on the Display tab')
+click_tab(r, 2); check(tab(r) == 'settings', 'clicking the Settings tab switches to it')
+a0 = area(); ca = G.SIXTH_SENSE_CAL
+G.MX, G.MY = to_window((ca.x0 + ca.x1) / 2 + 30, (ca.y0 + ca.y1) / 2); frames(1); G.LMB = 1; frames(1)
+G.MX, G.MY = G.MX + 150, G.MY + 60; frames(3); G.LMB = 0; frames(1)
+G.WHEEL = 5; frames(1); key('left')
+check(area() == a0, 'Settings tab: drag, wheel and arrows leave the radar where it is')
+click_tab(r, 1); check(tab(r) == 'display', 'clicking the Display tab switches back')
+G.MX, G.MY = to_window((ca.x0 + ca.x1) / 2 + 30, (ca.y0 + ca.y1) / 2); frames(1); G.LMB = 1; frames(1)
+G.MX = G.MX + 100; frames(3); G.LMB = 0; frames(1)
+check(area()[0] > a0[0] + 1, 'Display tab: drag moves the radar')
+G.WHEEL = 5; frames(1); check(abs((area()[2] - area()[0]) - (a0[2] - a0[0])) > 1, 'Display tab: the wheel resizes the radar')
+G.WHEEL = -5; frames(1); G.MX, G.MY = to_window((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2); frames(1); G.LMB = 1; frames(1); G.MX -= 100 * RW / SW * SX; frames(2); G.LMB = 0; frames(1)
+key('f7'); key('f7'); check(tab(r) == 'display', 'F7 reopens on Display')
+click_tab(r, 2)
 # slider: press on the knob, drag right
 c = G.SIXTH_SENSE_CAL
 w, h = 600 / SX, 16 / SY
 SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')
 tx, ty, _w, _h = SLR(1)
-check(abs(tx - (0.03 * c.bw + 150 / SX)) < 1e-6 and abs(ty + h - (GT - 0.08 * c.bh)) < 1e-6, 'slider panel at panel_fx 0.03, panel_fy 0.08 of the screen (%.1f, %.1f)' % (tx, ty))
+check(abs(tx - (0.03 * c.bw + 150 / SX)) < 1e-6 and abs(ty + h - (GT - 0.08 * c.bh - 80 / SY)) < 1e-6, 'slider panel at panel_fx 0.03, panel_fy 0.08 of the screen (%.1f, %.1f)' % (tx, ty))
 kx = tx + w * (scale() - 0.25) / (2.5 - 0.25)
 G.MX, G.MY = to_window(kx, ty + h / 2); frames(1)
 G.LMB = 1; frames(1); s0 = scale(); area_before = area()
@@ -111,7 +132,8 @@ ca = ((area_before[0] + area_before[2]) / 2, (area_before[1] + area_before[3]) /
 check(('area clamped (scale)' in open(LOGDIR + '/sixth_sense.log').read()) or abs(ca[0] - cb[0]) < 1e-3 and abs(ca[1] - cb[1]) < 1e-3, 'slider scaled around the centre (or was clamped)')
 check(area()[1] >= -1e-6 and area()[2] <= c.bw + 1e-6, 'after scaling: bottom >= 0 and right <= visible width (%.1f, %.1f)' % (area()[1], area()[2]))
 # drag far down and right: clamped
-s_before = scale(); G.MX, G.MY = to_window(c.bw * 0.5, GT * 0.5); frames(1); G.LMB = 1; frames(1)
+click_tab(r, 1)
+s_before = scale(); G.MX, G.MY = to_window((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2); frames(1); G.LMB = 1; frames(1)
 for k in range(20): G.MY -= 40; G.MX += 40; frames(1)
 G.LMB = 0; frames(1)
 check(abs(area()[1]) < 1e-6 or area()[1] > 0, 'drag down: bottom clamped at gy %.2f' % area()[1])
@@ -211,6 +233,7 @@ def press5(i): r5.execute('PRESSED[%d] = true' % i); run5(0.016)
 for k in (12, 13, 14, 15): press5(k)
 r5.execute('HELD[6] = true'); press5(12); press5(13); r5.execute('HELD = {}')
 check(abs(CFG5.sensitivity - 1) < 1e-9 and abs(CFG5.repeat_rate - 1) < 1e-9, "[ ] ; ' keys do nothing (sliders are mouse only)")
+click_tab(r5, 2)
 def drag_slider(i, frac):
     tx, ty, tw, th = r5.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')(i)
     kx = None
@@ -347,6 +370,8 @@ check(r10.globals().SIXTH_SENSE_RADAR.style == 'dots' and r10.eval('BITMAPS') ==
 r11 = radar_rt(); r11.execute('HUD_CFG.calibrate = true'); u11 = r11.eval('update'); g11 = r11.globals()
 open(INI, 'a').write('calibrate=true\n')
 r11 = radar_rt(); u11 = r11.eval('update'); g11 = r11.globals()
+for _ in range(220): u11(0.016)
+click_tab(r11, 2)
 def run11(sec):
     for _ in range(max(1, int(sec / 0.016))): u11(0.016)
 run11(3.5)
@@ -370,6 +395,8 @@ EXTRA2 = EXTRA.replace('Gui.material = function(g, id) return {mat = id} end', '
   '(kind == "texture" and id == "03c798e2775e07a4")', '(kind == "texture")')
 r12 = radar_rt(EXTRA2); u12 = r12.eval('update'); g12 = r12.globals()
 for _ in range(260): u12(0.016)
+click_tab(r12, 2)
+for _ in range(3): u12(0.016)
 I12 = g12.SIXTH_SENSE_RADAR; bm = tuple(g12.BM['03c798e2775e07a4'].values())
 check(bm is not None and abs(bm[2] / bm[3] - 1.25) < 1e-6, 'disc bitmap 1.25x wider than tall in screen px by default (%.1f x %.1f)' % (bm[2], bm[3]))
 rpx = I12.ry * 0.9333
@@ -379,6 +406,7 @@ check(abs(bm[0] + bm[2] / 2 / 1.2 - I12.cx) < 0.01 and abs(bm[1] + bm[3] / 2 / 0
 check(abs(I12.cx - 0.3 * 2133.33) < 0.1, 'the user placement keys are respected (radar_fx 0.3)')
 L12 = g12.SIXTH_SENSE_LABELS
 check(all(L12[k] == 'texture' for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')), 'slider labels drawn as word textures %s' % dict(L12))
+check(L12['tab_display'] == 'texture' and L12['tab_settings'] == 'texture', 'tab buttons drawn with their word textures')
 lg12 = open(LOGDIR + '/sixth_sense.log').read()
 check('bitmap label sensitivity: draw succeeded' in lg12, 'label bitmap result logged')
 # trim: radar_aspect 1.2 widens disc and overlay together
@@ -390,6 +418,8 @@ check(abs(bm[2] / bm[3] - 1.2) < 1e-6 and abs(I12.rx * 1.2 / (I12.ry * 0.9333) -
 r13 = radar_rt(EXTRA2.replace('Gui.bitmap = function(g, mat, p, sz, c)', 'Gui.bitmap = function(g, mat, p, sz, c) if TEXOF[g] ~= "03c798e2775e07a4" then error("no") end'))
 u13 = r13.eval('update'); g13 = r13.globals()
 for _ in range(260): u13(0.016)
+click_tab(r13, 2)
+for _ in range(3): u13(0.016)
 L13 = g13.SIXTH_SENSE_LABELS
 check(all(L13[k] == 'pixel' for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')) and g13.SIXTH_SENSE_RADAR.style == 'texture', 'label textures refused -> pixel font labels; the disc stays a texture')
 lg13 = open(LOGDIR + '/sixth_sense.log').read()
