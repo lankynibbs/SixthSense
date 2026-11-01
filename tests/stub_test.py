@@ -337,7 +337,7 @@ r7.execute('HUD_CFG.sensitivity = 2.0'); run7(0.1); p = dot7()
 check(p and abs(p[1] + 50 / 80) < 0.02 and p[3] >= 239, 'sensitivity 2: 50 m sits at 50/80 of the radius %s' % (p and '%.3f' % p[1]))
 r7.execute('HUD_CFG.sensitivity = 1.0')
 # dot sizes: small 6, medium 10, large 16 screen px (gui = px / 1.2 wide) at 1440 tall: x 1440/1080
-for name, px in (('small', 22 * 0.75), ('medium', 22), ('large', 22 * 1.35)):
+for name, px in (('small', 28 * 0.75), ('medium', 28), ('large', 28 * 1.35)):
     r7.execute('HUD_CFG.dot_size = "%s"' % name); g7.EX, g7.EY = 0, 10; run7(0.05); p = dot7()
     want = math.floor(px * 1440 / 1080 / 1.2 * g7.SIXTH_SENSE_CAL.d / 0.35)   # (the stub enemy is a Charger: large, 22 px at medium; box() floors)
     check(p and abs(p[2] - want) <= 1, 'dot_size %s = %.1f px (large class, Charger) (gui w %.0f, want %d)' % (name, px, p[2] if p else -1, want))
@@ -532,7 +532,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.4.2 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.4.3 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -601,7 +601,7 @@ import re as _re
 lua = open('src/sixth_sense.lua').read()
 for h, want in (('67dc32dca4f02d33', 'large'), ('f22d027b37bef107', 'large'), ('965eae5a51acdd4a', 'xlarge'), ('d37e8d120d2836e3', 'xlarge'), ('78e1497571012c47', 'tiny')):
     m = _re.search(r'\["%s"\] = "(\w+)"' % h, lua); check(m and m.group(1) == want, 'size map %s -> %s' % (h, want))
-check('CLASS_PX = { tiny = 5, medium = 11, large = 22, xlarge = 30 }' in lua and 'DOT_MUL = { small = 0.75, medium = 1.0, large = 1.35 }' in lua, 'base sizes 5/11/22/30 px, x 0.75/1/1.35')
+check('CLASS_PX = { tiny = 7, medium = 15, large = 28, xlarge = 38 }  -- v1.4.3: all dots larger' in lua and 'DOT_MUL = { small = 0.75, medium = 1.0, large = 1.35 }' in lua, 'base sizes 7/15/28/38 px, x 0.75/1/1.35')
 
 # ---------------------------------------------------------------- v1.4.2: load-time recovery
 open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=1.40\nradar_cy=0.30\nradar_d=0.30\n')

@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.4.2 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.4.3 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.4.2"
+local MOD, VERSION = "sixth_sense", "1.4.3"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -542,8 +542,8 @@ local FLYER = { ["19e18b46ec55d94a"] = true, ["282eb766c1ffa6a1"] = true }
 -- (light tiny, medium medium, heavy large); candidates of unknown kind are medium. Names from Treasure Radar's list.
 -- v1.4.1: base dot sizes in screen px at 1080 tall (dot_size medium), x dot_size (small 0.75, medium 1, large 1.35)
 -- x the area scale. SIZE_MULT (relative to medium) is kept for the log.
-local CLASS_PX = { tiny = 5, medium = 11, large = 22, xlarge = 30 }
-local SIZE_MULT = { tiny = 5 / 11, medium = 1.0, large = 2.0, xlarge = 30 / 11 }
+local CLASS_PX = { tiny = 7, medium = 15, large = 28, xlarge = 38 }  -- v1.4.3: all dots larger
+local SIZE_MULT = { tiny = 7 / 15, medium = 1.0, large = 28 / 15, xlarge = 38 / 15 }
 local SIZE_OF = {
   ["78e1497571012c47"] = "tiny", ["0adc9f9173ad8e1d"] = "tiny", ["44458a2c52b002fb"] = "tiny",   -- Voteless
   ["da40bb347c7447f2"] = "medium", ["604a794ec45bb820"] = "medium", ["e8f19a0aa958e46d"] = "medium",  -- Overseers
