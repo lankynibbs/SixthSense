@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.0 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.4.1 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -323,3 +323,13 @@ where the camera looks.
 - **Our turrets are never shown.** The Helldiver stratagem turret ids are excluded (`gatling_turret`, `manned_turret`, `manned_turret_discoverable`, `turret_machinegun_gpmg`, `tutorial_turret`). A listed structure that first appears after the first full walk within 50 m of you is also taken as ours, since enemy structures are there from the start.
 - **Fixed slider panel:** in F7 calibration the sliders, labels and values sit at `panel_fx`/`panel_fy` (default 0.03, 0.08: top left), kept on screen. Dragging, the wheel and the arrows move only the radar. The clamp applies to the radar alone.
 - **Tabs in F7 calibration:** there are two buttons, Display and Settings. They are word textures with a pixel-font fallback, fixed at the panel position, and the active one is lit. F7 always opens on **Display**, which shows only the radar with its outline and handles: drag moves it (clamped to the drawable area), and the wheel and arrows resize or nudge it. **Settings** shows the four sliders with their labels and values below the tabs. The radar stays visible as a preview but cannot be dragged, resized or nudged there. Mouse only, with no new keys.
+
+## v1.4.1 changes
+- **The panel is always visible.** The tabs, the Move button, the sliders, labels and values are drawn after the radar, on a higher layer: rects at 990 over the radar's 950, and label textures at 995 over the disc's 900. The cursor is drawn on top at 999. Each tab has a dark backing.
+- **Auto-placed panel:** if the radar's area covers the `panel_fx`/`panel_fy` spot, the panel moves to the opposite vertical half, then to the other side, then to the opposite corner. If none of those is clear, it takes the spot with the least overlap. It is placed when F7 opens, when the radar is dropped and when Move goes off, never mid-drag, and the log notes it ("panel: at ...").
+- **Move button** on the Display tab (a word texture, lit while on). Only with Move on does a left-drag move the radar and the wheel or arrows resize or nudge it. With Move off, clicks on the radar do nothing. Clicking Move again, switching tabs or closing with F7 turns it off and saves. F7 always opens with Move off.
+- **Wider dot sizes:** the base sizes in screen px at 1080 tall are tiny 5, medium 11, large 22 and xlarge 30. They are multiplied by dot_size (small 0.75, medium 1, large 1.35) and by the area scale.
+  - The Fleshmob `67dc32dca4f02d33` and the Leviathan `f22d027b37bef107` are large; the Leviathan was xlarge before.
+  - xlarge is the Harvester and the Factory/War Striders and Vox Engine.
+  - The hashlist has no Fleshmob (or other Illuminate unit) paths, so no other ids were found.
+  - Enemy structures stay medium diamonds (11 px).

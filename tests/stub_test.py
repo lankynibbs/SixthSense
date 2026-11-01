@@ -79,17 +79,26 @@ def check(ok, what): print(('PASS ' if ok else 'FAIL ') + what); (None if ok els
 frames(200)                              # settle + first draws
 a0 = area(); check(abs(a0[0] - 300) < 1e-6 and abs(a0[3] - 971.45) < 1e-6, 'the saved area loads unchanged from an older ini %s' % (a0,))
 SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end'); P0 = tuple(SLR(i) for i in (1, 4))
+# v1.4.1: with Move off (as F7 opens) a drag on the radar does nothing
+check(not r.eval('SIXTH_SENSE_MOVE()'), 'F7 open: Move is off')
+ax = area(); cx, cy = (ax[0] + ax[2]) / 2, (ax[1] + ax[3]) / 2 - 100
+G.MX, G.MY = to_window(cx, cy); frames(1); G.LMB = 1; frames(1); G.MX += 200; frames(2); G.LMB = 0; frames(1)
+G.WHEEL = 5; frames(1)
+check(area() == ax, 'Move off: drag and wheel leave the radar alone')
+click_tab(r, 3); check(r.eval('SIXTH_SENSE_MOVE()'), 'the Move button turns Move on')
 # drag inside the area: +200 window px right, +100 up
 cx, cy = (a0[0] + a0[2]) / 2, (a0[1] + a0[3]) / 2 - 100
 G.MX, G.MY = to_window(cx, cy); frames(2)
 G.LMB = 1; frames(1)
+P0 = tuple(SLR(i) for i in (1, 4))
 for k in range(10):
     G.MX += 20; G.MY += 10; frames(1)
+MID = tuple(SLR(i) for i in (1, 4))
 G.LMB = 0; frames(1)
 a1 = area(); dx = a1[0] - a0[0]; dy = a1[3] - a0[3]
 check(abs(dx - 200 * SW / RW / SX) < 1 and abs(dy - 100 * SH / RH / SY) < 1, 'drag moved the area by gui %.1f, %.1f (expected %.1f, %.1f)' % (dx, dy, 200 * SW / RW / SX, 100 * SH / RH / SY))
 check(abs(scale() - 0.5) < 1e-3, 'drag kept the scale')
-check(tuple(SLR(i) for i in (1, 4)) == P0, 'dragging the radar area left the slider panel where it was')
+check(MID == P0, 'mid-drag the slider panel stays put (re-placed only on drop)')
 # wheel
 s0 = scale(); G.WHEEL = 3; upd(0.016); G.WHEEL = 0; frames(1)
 check(scale() > s0 * 1.05, 'wheel up scaled %.3f -> %.3f' % (s0, scale()))
@@ -108,19 +117,26 @@ G.MX, G.MY = G.MX + 150, G.MY + 60; frames(3); G.LMB = 0; frames(1)
 G.WHEEL = 5; frames(1); key('left')
 check(area() == a0, 'Settings tab: drag, wheel and arrows leave the radar where it is')
 click_tab(r, 1); check(tab(r) == 'display', 'clicking the Display tab switches back')
+check(not r.eval('SIXTH_SENSE_MOVE()'), 'a tab switch turned Move off')
+click_tab(r, 3)
 G.MX, G.MY = to_window((ca.x0 + ca.x1) / 2 + 30, (ca.y0 + ca.y1) / 2); frames(1); G.LMB = 1; frames(1)
 G.MX = G.MX + 100; frames(3); G.LMB = 0; frames(1)
 check(area()[0] > a0[0] + 1, 'Display tab: drag moves the radar')
 G.WHEEL = 5; frames(1); check(abs((area()[2] - area()[0]) - (a0[2] - a0[0])) > 1, 'Display tab: the wheel resizes the radar')
 G.WHEEL = -5; frames(1); G.MX, G.MY = to_window((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2); frames(1); G.LMB = 1; frames(1); G.MX -= 100 * RW / SW * SX; frames(2); G.LMB = 0; frames(1)
-key('f7'); key('f7'); check(tab(r) == 'display', 'F7 reopens on Display')
+click_tab(r, 3); check(not r.eval('SIXTH_SENSE_MOVE()') and 'move off (button)' in open(LOGDIR + '/sixth_sense.log').read(), 'a second click turns Move off and saves')
+click_tab(r, 3); key('f7'); key('f7'); check(tab(r) == 'display' and not r.eval('SIXTH_SENSE_MOVE()'), 'F7 reopens on Display with Move off')
 click_tab(r, 2)
 # slider: press on the knob, drag right
 c = G.SIXTH_SENSE_CAL
 w, h = 600 / SX, 16 / SY
 SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')
 tx, ty, _w, _h = SLR(1)
-check(abs(tx - (0.03 * c.bw + 150 / SX)) < 1e-6 and abs(ty + h - (GT - 0.08 * c.bh - 80 / SY)) < 1e-6, 'slider panel at panel_fx 0.03, panel_fy 0.08 of the screen (%.1f, %.1f)' % (tx, ty))
+PN = tuple(r.eval('function() return {SIXTH_SENSE_PANEL()} end')().values())
+ar = area()
+ov = max(0, min(PN[4], ar[2]) - max(PN[2], ar[0])) * max(0, min(PN[5], ar[3]) - max(PN[3], ar[1]))
+check(abs(tx - (PN[0] * c.bw + 150 / SX)) < 1e-6 , 'slider panel at its placed spot %.2f, %.2f (%.1f, %.1f)' % (PN[0], PN[1], tx, ty))
+check(ov == 0 or 'least' in open(LOGDIR + '/sixth_sense.log').read(), 'the panel was placed off the radar (overlap %.0f)' % ov)
 kx = tx + w * (scale() - 0.25) / (2.5 - 0.25)
 G.MX, G.MY = to_window(kx, ty + h / 2); frames(1)
 G.LMB = 1; frames(1); s0 = scale(); area_before = area()
@@ -132,7 +148,7 @@ ca = ((area_before[0] + area_before[2]) / 2, (area_before[1] + area_before[3]) /
 check(('area clamped (scale)' in open(LOGDIR + '/sixth_sense.log').read()) or abs(ca[0] - cb[0]) < 1e-3 and abs(ca[1] - cb[1]) < 1e-3, 'slider scaled around the centre (or was clamped)')
 check(area()[1] >= -1e-6 and area()[2] <= c.bw + 1e-6, 'after scaling: bottom >= 0 and right <= visible width (%.1f, %.1f)' % (area()[1], area()[2]))
 # drag far down and right: clamped
-click_tab(r, 1)
+click_tab(r, 1); click_tab(r, 3)
 s_before = scale(); G.MX, G.MY = to_window((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2); frames(1); G.LMB = 1; frames(1)
 for k in range(20): G.MY -= 40; G.MX += 40; frames(1)
 G.LMB = 0; frames(1)
@@ -327,10 +343,10 @@ r7.execute('HUD_CFG.sensitivity = 2.0'); run7(0.1); p = dot7()
 check(p and abs(p[1] + 50 / 80) < 0.02 and p[3] >= 239, 'sensitivity 2: 50 m sits at 50/80 of the radius %s' % (p and '%.3f' % p[1]))
 r7.execute('HUD_CFG.sensitivity = 1.0')
 # dot sizes: small 6, medium 10, large 16 screen px (gui = px / 1.2 wide) at 1440 tall: x 1440/1080
-for name, px in (('small', 6), ('medium', 10), ('large', 16)):
+for name, px in (('small', 22 * 0.75), ('medium', 22), ('large', 22 * 1.35)):
     r7.execute('HUD_CFG.dot_size = "%s"' % name); g7.EX, g7.EY = 0, 10; run7(0.05); p = dot7()
-    want = math.floor(px * 1440 / 1080 * 1.6 / 1.2)   # (the stub enemy is a Charger, a heavy: size class large, 1.6x; box() floors)
-    check(p and p[2] == want, 'dot_size %s = %d px x1.6 (large class, Charger) (gui w %.0f, want %d)' % (name, px, p[2] if p else -1, want))
+    want = math.floor(px * 1440 / 1080 / 1.2)   # (the stub enemy is a Charger: large, 22 px at medium; box() floors)
+    check(p and abs(p[2] - want) <= 1, 'dot_size %s = %.1f px (large class, Charger) (gui w %.0f, want %d)' % (name, px, p[2] if p else -1, want))
 r7.execute('HUD_CFG.dot_size = "medium"')
 # lost: lingers for the hold, then fades, then goes
 g7.EX, g7.EY = 0, -20; run7(0.5); g7.EALIVE = False; run7(0.1); p = dot7()
@@ -522,7 +538,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and open(INI).read().startswith(OLD), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.4.0 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.4.1 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -575,6 +591,23 @@ r42.execute('MESH[TUR] = {vis = false}'); run42(0.4)
 check(e42('TUR') is None and g42.HUD_S.ghost[g42.TUR] is None, 'destroyed turret (mesh hidden) cleared within 0.4 s')
 r42.execute('ALIVE[USER] = false'); run42(0.4)
 check(e42('USER') is None, 'a structure no longer alive is dropped')
+
+# ---------------------------------------------------------------- v1.4.1: panel on top and placed off the radar; size spread
+open(INI, 'w').write('calibrate=true\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=0\narea_y0=600\narea_x1=900\narea_y1=1080\n')
+r50 = radar_rt('\nLAYERS = {}\nlocal oldr = Gui.rect\nGui.rect = function(g, p, sz, c) LAYERS[#LAYERS + 1] = p[3]; return oldr(g, p, sz, c) end')
+u50 = r50.eval('update'); g50 = r50.globals()
+for _ in range(220): u50(0.016)
+PN = tuple(r50.eval('function() return {SIXTH_SENSE_PANEL()} end')().values()); c50 = g50.SIXTH_SENSE_CAL
+ov = max(0, min(PN[4], c50.x1) - max(PN[2], c50.x0)) * max(0, min(PN[5], c50.y1) - max(PN[3], c50.y0))
+check(ov == 0 and (PN[0], PN[1]) != (0.03, 0.08), 'radar at the top-left: the panel moved off it (%.2f, %.2f)' % PN[:2])
+r50.execute('LAYERS = {}'); u50(0.016)
+L = list(g50.LAYERS.values())
+check(990 in L and L.index(990) > max(i for i, v in enumerate(L) if v == 950) and min(L) >= 950, 'panel rects drawn last, on layer 990 above the radar (950)')
+import re as _re
+lua = open('src/sixth_sense.lua').read()
+for h, want in (('67dc32dca4f02d33', 'large'), ('f22d027b37bef107', 'large'), ('965eae5a51acdd4a', 'xlarge'), ('d37e8d120d2836e3', 'xlarge'), ('78e1497571012c47', 'tiny')):
+    m = _re.search(r'\["%s"\] = "(\w+)"' % h, lua); check(m and m.group(1) == want, 'size map %s -> %s' % (h, want))
+check('CLASS_PX = { tiny = 5, medium = 11, large = 22, xlarge = 30 }' in lua and 'DOT_MUL = { small = 0.75, medium = 1.0, large = 1.35 }' in lua, 'base sizes 5/11/22/30 px, x 0.75/1/1.35')
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)
