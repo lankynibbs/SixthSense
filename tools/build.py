@@ -1,7 +1,7 @@
-"""Build Rear-Heat-HUD.zip: Bingus Shared Loader's build_addon.py packaging (same entry declaration, manifest and zip
+"""Build SixthSense.zip (Sixth Sense, formerly Rear Heat HUD): Bingus Shared Loader's build_addon.py packaging (same entry declaration, manifest and zip
 layout), plus the radar disc texture in the same patch (Lua type row + texture type row; pixels in .gpu_resources),
 written the way Treasure Radar ships its textures (Treasure-Radar/src/patch_writer.py, icon_textures.texture_resource).
-  python3 tools/build.py [--no-texture] [--output Rear-Heat-HUD.zip]"""
+  python3 tools/build.py [--no-texture] [--output SixthSense.zip]"""
 import argparse, json, struct, sys, uuid, zipfile
 from pathlib import Path
 HERE = Path(__file__).resolve().parents[1]
@@ -12,7 +12,8 @@ from archive import ARCHIVE, resource_hash, make_archive
 import patch_writer
 from PIL import Image
 
-NAME = 'mods/darryl/rear_heat_hud'
+NAME = 'mods/darryl/sixth_sense'
+# (the textures keep their v1.3 resource paths: their ids are named in the Lua; the GUID is unchanged)
 TEXTURES = [('mods/darryl/rear_heat_hud/radar_disc', 'radar_disc.png')] + [
     ('mods/darryl/rear_heat_hud/label_' + k, 'label_%s.png' % k) for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')]
 LUA, TEXTURE = 0xA14E8DFA2CD117E2, 0xCD4238C6A0C69E32
@@ -29,11 +30,11 @@ def texture_resource(w, h):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--output', default=str(HERE / 'Rear-Heat-HUD.zip'))
+    ap.add_argument('--output', default=str(HERE / 'SixthSense.zip'))
     ap.add_argument('--no-texture', action='store_true')
     a = ap.parse_args()
-    src = (HERE / 'src/rear_heat_hud.lua').read_bytes()
-    version = src.split(b'VERSION = "rear_heat_hud", "')[0] and src.split(b'"rear_heat_hud", "')[1].split(b'"')[0].decode()
+    src = (HERE / 'src/sixth_sense.lua').read_bytes()
+    version = src.split(b'"sixth_sense", "')[1].split(b'"')[0].decode()
     for name, _ in TEXTURES:
         assert ('%016x' % resource_hash(name)).encode() in src, 'the Lua must name the texture id of ' + name
     body = entry_source(NAME, src)
@@ -48,7 +49,7 @@ def main():
         toc, gpu, stream = patch_writer.write(entries, [(LUA, 16), (TEXTURE, 64)], pad_toc=True)
         patch_writer.check(toc, gpu, stream)
     guid = str(uuid.UUID((HERE / 'GUID.txt').read_text().strip()))
-    title = 'Rear Heat HUD v' + version
+    title = 'Sixth Sense v' + version
     desc = 'Requires Bingus Shared Loader v15 or newer / API 1. Enable both and deploy.'
     manifest = {'Version': 1, 'Guid': guid, 'Name': title, 'Description': desc,
                 'Options': [{'Name': title, 'Description': desc, 'Include': ['Addon']}]}

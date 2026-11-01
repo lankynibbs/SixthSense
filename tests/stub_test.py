@@ -24,7 +24,7 @@ Application.back_buffer_size=function() return 2560,1440 end
 stingray={Vector3=Vector3,Vector2=Vector2,Color=Color}
 Vector3=nil; Vector2={}
 ''')
-r.execute(open('src/rear_heat_hud.lua').read().replace('\\\\','/'))
+r.execute(open('src/sixth_sense.lua').read().replace('\\\\','/'))
 for i in range(4000): r.eval('update')(0.016)
 print('rects',r.eval('rects'))
 
@@ -32,10 +32,11 @@ print('rects',r.eval('rects'))
 import os, re
 LOGDIR = '/tmp/rh/CowboyBingus/Helldivers2/Logs'
 os.makedirs(LOGDIR, exist_ok=True)
-INI = LOGDIR + '/rear_heat_hud.ini'
+INI = LOGDIR + '/sixth_sense.ini'
 if os.path.exists(INI): os.remove(INI)
+if os.path.exists(LOGDIR + '/rear_heat_hud.ini'): os.remove(LOGDIR + '/rear_heat_hud.ini')
 open(INI, 'w').write('calibrate=true\nbar_debug=true\narea_x0=300\narea_y0=200\narea_x1=1366.67\narea_y1=971.45\n')   # an older ini with a saved area (scale 0.5)
-SRC = open('src/rear_heat_hud.lua').read().replace('\\\\', '/')
+SRC = open('src/sixth_sense.lua').read().replace('\\\\', '/')
 PRE = r'''
 MX, MY, LMB, WHEEL, DZ = 960, 540, 0, 0, {1, 0.05}
 PRESSED, HELD = {}, {}
@@ -61,8 +62,8 @@ def frames(n=1):
     for _ in range(n):
         upd(0.016)
         r.execute('PRESSED = {}'); G.WHEEL = 0
-def area(): c = G.REAR_HEAT_HUD_CAL; return c.x0, c.y0, c.x1, c.y1
-def scale(): c = G.REAR_HEAT_HUD_CAL; return (c.x1 - c.x0) / c.bw
+def area(): c = G.SIXTH_SENSE_CAL; return c.x0, c.y0, c.x1, c.y1
+def scale(): c = G.SIXTH_SENSE_CAL; return (c.x1 - c.x0) / c.bw
 SW, SH, RW, RH, SX, SY, GT = 2560, 1440, 1920, 1080, 1.2, 0.9333, 1080
 def to_window(gx, gy):       # gui -> the cursor axis (window px, from the bottom, y up)
     px, py = gx * SX, (GT - gy) * SY
@@ -72,6 +73,7 @@ fails = []
 def check(ok, what): print(('PASS ' if ok else 'FAIL ') + what); (None if ok else fails.append(what))
 frames(200)                              # settle + first draws
 a0 = area(); check(abs(a0[0] - 300) < 1e-6 and abs(a0[3] - 971.45) < 1e-6, 'the saved area loads unchanged from an older ini %s' % (a0,))
+SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end'); P0 = tuple(SLR(i) for i in (1, 4))
 # drag inside the area: +200 window px right, +100 up
 cx, cy = (a0[0] + a0[2]) / 2, (a0[1] + a0[3]) / 2 - 100
 G.MX, G.MY = to_window(cx, cy); frames(2)
@@ -82,6 +84,7 @@ G.LMB = 0; frames(1)
 a1 = area(); dx = a1[0] - a0[0]; dy = a1[3] - a0[3]
 check(abs(dx - 200 * SW / RW / SX) < 1 and abs(dy - 100 * SH / RH / SY) < 1, 'drag moved the area by gui %.1f, %.1f (expected %.1f, %.1f)' % (dx, dy, 200 * SW / RW / SX, 100 * SH / RH / SY))
 check(abs(scale() - 0.5) < 1e-3, 'drag kept the scale')
+check(tuple(SLR(i) for i in (1, 4)) == P0, 'dragging the radar area left the slider panel where it was')
 # wheel
 s0 = scale(); G.WHEEL = 3; upd(0.016); G.WHEEL = 0; frames(1)
 check(scale() > s0 * 1.05, 'wheel up scaled %.3f -> %.3f' % (s0, scale()))
@@ -92,19 +95,20 @@ x0 = area()[0]; key('left'); check(abs(area()[0] - (x0 - 2 / SX)) < 1e-6, 'left 
 r.execute('HELD[6] = true'); x0 = area()[0]; key('right'); check(abs(area()[0] - (x0 + 20 / SX)) < 1e-6, 'shift+right nudged 20 px'); r.execute('HELD = {}')
 y1 = area()[3]; key('up'); check(abs(area()[3] - (y1 + 2 / SY)) < 1e-6, 'up arrow moved the area up (gui y +)')
 # slider: press on the knob, drag right
-c = G.REAR_HEAT_HUD_CAL
+c = G.SIXTH_SENSE_CAL
 w, h = 600 / SX, 16 / SY
-scx = min(max((c.x0 + c.x1) / 2, w / 2 + 20), c.bw - w / 2 - 20)
-top = min(max(c.y1 - (c.y1 - c.y0) * 0.08, GT - c.bh + h + 40 / SY), GT - 40 / SY)
-tx, ty = scx - w / 2, top - h
+SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')
+tx, ty, _w, _h = SLR(1)
+check(abs(tx - (0.03 * c.bw + 150 / SX)) < 1e-6 and abs(ty + h - (GT - 0.08 * c.bh)) < 1e-6, 'slider panel at panel_fx 0.03, panel_fy 0.08 of the screen (%.1f, %.1f)' % (tx, ty))
 kx = tx + w * (scale() - 0.25) / (2.5 - 0.25)
 G.MX, G.MY = to_window(kx, ty + h / 2); frames(1)
 G.LMB = 1; frames(1); s0 = scale(); area_before = area()
 G.MX, G.MY = to_window(tx + w * 0.3, ty + h / 2); frames(3)
 G.LMB = 0; frames(1)
+check(tuple(SLR(1)) == (tx, ty, _w, _h) or abs(SLR(1)[0] - tx) < 1e-9, 'the panel did not move with the scale change')
 check(abs(scale() - (0.25 + 2.25 * 0.3)) < 0.02, 'slider drag set the scale %.3f -> %.3f' % (s0, scale()))
 ca = ((area_before[0] + area_before[2]) / 2, (area_before[1] + area_before[3]) / 2); cb = ((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2)
-check(('area clamped (scale)' in open(LOGDIR + '/rear_heat_hud.log').read()) or abs(ca[0] - cb[0]) < 1e-3 and abs(ca[1] - cb[1]) < 1e-3, 'slider scaled around the centre (or was clamped)')
+check(('area clamped (scale)' in open(LOGDIR + '/sixth_sense.log').read()) or abs(ca[0] - cb[0]) < 1e-3 and abs(ca[1] - cb[1]) < 1e-3, 'slider scaled around the centre (or was clamped)')
 check(area()[1] >= -1e-6 and area()[2] <= c.bw + 1e-6, 'after scaling: bottom >= 0 and right <= visible width (%.1f, %.1f)' % (area()[1], area()[2]))
 # drag far down and right: clamped
 s_before = scale(); G.MX, G.MY = to_window(c.bw * 0.5, GT * 0.5); frames(1); G.LMB = 1; frames(1)
@@ -112,7 +116,7 @@ for k in range(20): G.MY -= 40; G.MX += 40; frames(1)
 G.LMB = 0; frames(1)
 check(abs(area()[1]) < 1e-6 or area()[1] > 0, 'drag down: bottom clamped at gy %.2f' % area()[1])
 check(area()[2] <= c.bw + 1e-6, 'drag right: right edge clamped at gx %.1f (max %.1f)' % (area()[2], c.bw))
-lg = open(LOGDIR + '/rear_heat_hud.log').read()
+lg = open(LOGDIR + '/sixth_sense.log').read()
 check('drawable gui bounds' in lg and 'area clamped (move)' in lg, 'bounds and clamp logged')
 # the ini gets the area after the 0.5 s throttle
 frames(40)
@@ -124,14 +128,14 @@ check(all(abs(vals['area_' + k] - v) < 0.01 for k, v in zip(('x0', 'y0', 'x1', '
 key('f7'); ini = open(INI).read()
 check('calibrate=false' in ini and 'toggle_key=f7' in ini, 'F7 saved calibrate=false')
 check(abs(r.eval('DZ[2]') - 0.05) < 1e-9, 'mouse dead zone untouched / given back')
-n0 = r.eval('rects'); frames(1); rd = G.REAR_HEAT_HUD_RADAR; check(r.eval('rects') - n0 == rd.rects and rd.rects <= 300, 'calibrate off: only the radar drawn (%d rects incl. player marker; radar %d)' % (r.eval('rects') - n0, rd.rects))
-log = open(LOGDIR + '/rear_heat_hud.log').read()
+n0 = r.eval('rects'); frames(1); rd = G.SIXTH_SENSE_RADAR; check(r.eval('rects') - n0 == rd.rects and rd.rects <= 300, 'calibrate off: only the radar drawn (%d rects incl. player marker; radar %d)' % (r.eval('rects') - n0, rd.rects))
+log = open(LOGDIR + '/sixth_sense.log').read()
 check('area calibration off (f7): gui left' in log and 'screen px' in log, 'edges logged in gui and screen px')
 check('input: mouse move 1: cursor axis raw' in log, 'raw mouse moves logged')
 # restart: the area loads from the ini, calibration stays off
 r2 = runtime(); u2 = r2.eval('update')
 for _ in range(200): u2(0.016)
-c2 = r2.globals().REAR_HEAT_HUD_CAL
+c2 = r2.globals().SIXTH_SENSE_CAL
 check(abs(c2.x0 - a[0]) < 0.01 and abs(c2.y1 - a[3]) < 0.01 and not c2.on, 'restart loads the saved area, calibration off')
 # hidden game cursor: the mouse is held (dead zone) and the cursor axis moves still move the drawn cursor
 r3 = runtime(); r3.execute('Window.show_cursor = function() return false end'); os.remove(INI)
@@ -185,7 +189,7 @@ run4(1.2); check(S4.heat[2] < 0.01, 'faded out by 2.7 s (%.3f)' % S4.heat[2])
 # dead: dropped from tracking
 g4.EX, g4.EY = 0, -10; run4(1); g4.EALIVE = False; run4(0.2)
 check(S4.nT == 0 or S4.target[2] == 0, 'dead enemy dropped (tracked %d, target %.2f)' % (S4.nT, S4.target[2]))
-lg = open(LOGDIR + '/rear_heat_hud.log').read()
+lg = open(LOGDIR + '/sixth_sense.log').read()
 check(re.search(r'nearest 1a7fcdff98c664b0 known .* bearing [-+]\d+ \((left|right)\) -> (bar [LCR]|front, no bar)', lg) is not None, 'nearest threat logged with id, distance, bearing and bar')
 ini2 = open(INI).read()
 check(all(k in ini2 for k in ('area_x0=', 'area_y0=', 'area_x1=', 'area_y1=')), 'area keys still in the ini')
@@ -208,14 +212,14 @@ for k in (12, 13, 14, 15): press5(k)
 r5.execute('HELD[6] = true'); press5(12); press5(13); r5.execute('HELD = {}')
 check(abs(CFG5.sensitivity - 1) < 1e-9 and abs(CFG5.repeat_rate - 1) < 1e-9, "[ ] ; ' keys do nothing (sliders are mouse only)")
 def drag_slider(i, frac):
-    tx, ty, tw, th = r5.eval('function(i) return REAR_HEAT_HUD_SLIDER(i) end')(i)
+    tx, ty, tw, th = r5.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')(i)
     kx = None
     g5.MX, g5.MY = to_window(tx + tw * 0.5, ty + th / 2); run5(0.02)
     g5.LMB = 1; run5(0.02)
     g5.MX, g5.MY = to_window(tx + tw * frac, ty + th / 2); run5(0.05)
     g5.LMB = 0; run5(0.02)
 a_before = area()
-c5 = g5.REAR_HEAT_HUD_CAL
+c5 = g5.SIXTH_SENSE_CAL
 a_before = (c5.x0, c5.y0, c5.x1, c5.y1); sc_before = (c5.x1 - c5.x0) / c5.bw
 drag_slider(2, (2.0 - 0.25) / 2.75); check(abs(CFG5.sensitivity - 2.0) < 0.02, 'orange slider drag set sensitivity %.3f' % CFG5.sensitivity)
 drag_slider(3, (2.0 - 0.25) / 2.75); check(abs(CFG5.repeat_rate - 2.0) < 0.02, 'magenta slider drag set repeat_rate %.3f' % CFG5.repeat_rate)
@@ -242,11 +246,11 @@ run5(0.6); check(S5.heat[2] < 0.01, 'rate 2: gone by 1.35 s (hold 0.5 + fade 0.7
 r5.execute('HUD_CFG.repeat_rate = 2.0'); run5(0.1); n0 = S5.next_known - S5.t
 check(0 < n0 <= 0.25 + 1e-6, 'rate 2: known enemies re-acquired every 0.25 s (next in %.3f)' % n0)
 # saved to the ini (throttled), area keys untouched by settings
-r5.execute('HUD_CFG.sensitivity = 1.55; HUD_CFG.repeat_rate = 0.8; REAR_HEAT_HUD_CAL.dirty = true'); run5(1.0)
+r5.execute('HUD_CFG.sensitivity = 1.55; HUD_CFG.repeat_rate = 0.8; SIXTH_SENSE_CAL.dirty = true'); run5(1.0)
 ini5 = open(INI).read(); vals = dict(re.findall(r'^(\w+)=(.*)$', ini5, re.M))
 check(vals.get('sensitivity') == '1.55' and vals.get('repeat_rate') == '0.80', 'ini has sensitivity %s repeat_rate %s' % (vals.get('sensitivity'), vals.get('repeat_rate')))
 check(abs(float(vals['area_x0']) - c5.x0) < 0.01 and abs(float(vals['area_x0']) - 300) < 0.01 and abs(float(vals['area_y1']) - 971.45) < 0.01 and vals.get('range') == '40' and vals.get('swap_sides') == 'false', 'area and other ini keys untouched')
-lg = open(LOGDIR + '/rear_heat_hud.log').read()
+lg = open(LOGDIR + '/sixth_sense.log').read()
 r6 = runtime(); r6.execute('''local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end
 HUD_CFG = find(find(update, "step"), "CFG")''')
 C6 = r6.globals().HUD_CFG
@@ -270,7 +274,7 @@ r7 = radar_rt(); u7 = r7.eval('update'); g7 = r7.globals()
 def run7(sec):
     for _ in range(max(1, int(sec / 0.016))): r7.execute('DOTS = {}'); u7(0.016)
 run7(3.5)
-I7 = g7.REAR_HEAT_HUD_RADAR
+I7 = g7.SIXTH_SENSE_RADAR
 def dot7():
     D = g7.DOTS
     if not D or len(D) == 0: return None
@@ -327,18 +331,18 @@ Material = {set_texture = function(m, slot, tex) SET = {slot, tex} end}
 Gui.bitmap = function(g, mat, p, sz, c) BITMAPS = BITMAPS + 1 end'''
 r8 = radar_rt(EXTRA); u8 = r8.eval('update')
 for _ in range(220): u8(0.016)
-I8 = r8.globals().REAR_HEAT_HUD_RADAR
+I8 = r8.globals().SIXTH_SENSE_RADAR
 check(I8.style == 'texture' and r8.eval('BITMAPS') > 50 and r8.eval('SET[2]') == '03c798e2775e07a4' and I8.rects < 10, 'texture path: Gui.bitmap draws the disc (%s, %d bitmaps, %d rects)' % (I8.style, r8.eval('BITMAPS'), I8.rects))
-lg8 = open(LOGDIR + '/rear_heat_hud.log').read()
+lg8 = open(LOGDIR + '/sixth_sense.log').read()
 check('radar: texture bitmap draw succeeded' in lg8, 'texture success logged')
 r9 = radar_rt(EXTRA + '\nGui.bitmap = function() error("refused") end'); u9 = r9.eval('update')
 for _ in range(220): u9(0.016)
-I9 = r9.globals().REAR_HEAT_HUD_RADAR
-lg9 = open(LOGDIR + '/rear_heat_hud.log').read()
+I9 = r9.globals().SIXTH_SENSE_RADAR
+lg9 = open(LOGDIR + '/sixth_sense.log').read()
 check(I9.style == 'dots' and I9.rects > 100 and 'radar: texture bitmap draw failed: ' in lg9, 'bitmap refused -> rect dots, logged')
 r10 = radar_rt(EXTRA + '\nHUD_CFG.radar_style = "dots"'); u10 = r10.eval('update')
 for _ in range(220): u10(0.016)
-check(r10.globals().REAR_HEAT_HUD_RADAR.style == 'dots' and r10.eval('BITMAPS') == 0, 'radar_style=dots never tries the texture')
+check(r10.globals().SIXTH_SENSE_RADAR.style == 'dots' and r10.eval('BITMAPS') == 0, 'radar_style=dots never tries the texture')
 # dot_size slider: 3 snaps, saved
 r11 = radar_rt(); r11.execute('HUD_CFG.calibrate = true'); u11 = r11.eval('update'); g11 = r11.globals()
 open(INI, 'a').write('calibrate=true\n')
@@ -347,7 +351,7 @@ def run11(sec):
     for _ in range(max(1, int(sec / 0.016))): u11(0.016)
 run11(3.5)
 C11 = g11.HUD_CFG
-tx, ty, tw, th = r11.eval('function(i) return REAR_HEAT_HUD_SLIDER(i) end')(4)
+tx, ty, tw, th = r11.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')(4)
 for frac, want in ((0.05, 'small'), (0.6, 'medium'), (0.95, 'large')):
     g11.MX, g11.MY = to_window(tx + tw * 0.5, ty + th / 2); run11(0.02); g11.LMB = 1; run11(0.02)
     g11.MX, g11.MY = to_window(tx + tw * frac, ty + th / 2); run11(0.05); g11.LMB = 0; run11(0.02)
@@ -366,16 +370,16 @@ EXTRA2 = EXTRA.replace('Gui.material = function(g, id) return {mat = id} end', '
   '(kind == "texture" and id == "03c798e2775e07a4")', '(kind == "texture")')
 r12 = radar_rt(EXTRA2); u12 = r12.eval('update'); g12 = r12.globals()
 for _ in range(260): u12(0.016)
-I12 = g12.REAR_HEAT_HUD_RADAR; bm = tuple(g12.BM['03c798e2775e07a4'].values())
+I12 = g12.SIXTH_SENSE_RADAR; bm = tuple(g12.BM['03c798e2775e07a4'].values())
 check(bm is not None and abs(bm[2] / bm[3] - 1.25) < 1e-6, 'disc bitmap 1.25x wider than tall in screen px by default (%.1f x %.1f)' % (bm[2], bm[3]))
 rpx = I12.ry * 0.9333
 check(abs(bm[3] - 2 * rpx / (250 / 256)) < 0.5 and abs(bm[2] - 2 * I12.rx * 1.2 / (250 / 256)) < 0.5, 'disc rim = the overlay ellipse on both axes (w %.1f, overlay %.1f)' % (bm[2], 2 * I12.rx * 1.2 / (250 / 256)))
 # the disc's centre (bottom-left + half its px size mapped back to gui units) is the radar centre
 check(abs(bm[0] + bm[2] / 2 / 1.2 - I12.cx) < 0.01 and abs(bm[1] + bm[3] / 2 / 0.9333 - I12.cy) < 0.01, 'disc centred on the overlay')
 check(abs(I12.cx - 0.3 * 2133.33) < 0.1, 'the user placement keys are respected (radar_fx 0.3)')
-L12 = g12.REAR_HEAT_HUD_LABELS
+L12 = g12.SIXTH_SENSE_LABELS
 check(all(L12[k] == 'texture' for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')), 'slider labels drawn as word textures %s' % dict(L12))
-lg12 = open(LOGDIR + '/rear_heat_hud.log').read()
+lg12 = open(LOGDIR + '/sixth_sense.log').read()
 check('bitmap label sensitivity: draw succeeded' in lg12, 'label bitmap result logged')
 # trim: radar_aspect 1.2 widens disc and overlay together
 r12.execute('local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end; find(find(update, "step"), "CFG").radar_aspect = 1.2')
@@ -386,16 +390,16 @@ check(abs(bm[2] / bm[3] - 1.2) < 1e-6 and abs(I12.rx * 1.2 / (I12.ry * 0.9333) -
 r13 = radar_rt(EXTRA2.replace('Gui.bitmap = function(g, mat, p, sz, c)', 'Gui.bitmap = function(g, mat, p, sz, c) if TEXOF[g] ~= "03c798e2775e07a4" then error("no") end'))
 u13 = r13.eval('update'); g13 = r13.globals()
 for _ in range(260): u13(0.016)
-L13 = g13.REAR_HEAT_HUD_LABELS
-check(all(L13[k] == 'pixel' for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')) and g13.REAR_HEAT_HUD_RADAR.style == 'texture', 'label textures refused -> pixel font labels; the disc stays a texture')
-lg13 = open(LOGDIR + '/rear_heat_hud.log').read()
+L13 = g13.SIXTH_SENSE_LABELS
+check(all(L13[k] == 'pixel' for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size')) and g13.SIXTH_SENSE_RADAR.style == 'texture', 'label textures refused -> pixel font labels; the disc stays a texture')
+lg13 = open(LOGDIR + '/sixth_sense.log').read()
 check('error' not in lg13.lower().replace('last error nil', ''), 'no errors in the log')
 # calibrate off: no labels, no slider drawing
 r14 = radar_rt(EXTRA2); r14.execute('BMCOUNT = 0'); u14 = r14.eval('update')
 open(INI, 'w').write('calibrate=false\nv110_migrated=true\n')
 r14 = radar_rt(EXTRA2); u14 = r14.eval('update')
 for _ in range(260): u14(0.016)
-check(len(list(r14.globals().REAR_HEAT_HUD_LABELS.keys())) == 0 and list(r14.globals().BM.keys()) == ['03c798e2775e07a4'], 'calibrate off: only the disc bitmap, no labels')
+check(len(list(r14.globals().SIXTH_SENSE_LABELS.keys())) == 0 and list(r14.globals().BM.keys()) == ['03c798e2775e07a4'], 'calibrate off: only the disc bitmap, no labels')
 # pixel font sanity: every glyph is 35 cells
 
 # ---------------------------------------------------------------- v1.3.2: pods, fallers, persistence, death, sizes, aspect migration
@@ -443,11 +447,11 @@ run32(2.5, fall=False)
 check(ent('FALL').show, 'the faller shows again 2 s after it landed')
 for nm, want in (('VOT', 'tiny'), ('enemy', 'large'), ('HARV', 'xlarge'), ('CAND', 'medium'), ('STR', 'medium')):
     check(ent(nm).size == want, 'size class %s -> %s (%s)' % (nm, want, ent(nm).size))
-lg32 = open(LOGDIR + '/rear_heat_hud.log').read()
+lg32 = open(LOGDIR + '/sixth_sense.log').read()
 check('size: aabbccddeeff0011' in lg32 and 'not in the size map' in lg32, 'unknown kind logged with its size class')
 # dot sizes: a Harvester's dot is 2.2/0.6 of a Voteless's
 r32.execute('DOTS = {}'); run32(0.02, fall=False)
-I32 = g32.REAR_HEAT_HUD_RADAR
+I32 = g32.SIXTH_SENSE_RADAR
 def dot_at(x, y):
     for d in g32.DOTS.values():
         if abs(d[1] - (I32.cx + x / 40 * I32.rx)) < 3 and abs(d[2] - (I32.cy + y / 40 * I32.ry)) < 3: return d
@@ -476,5 +480,71 @@ open(INI, 'w').write(ini.replace('radar_aspect=1.25', 'radar_aspect=1.0'))
 r33 = radar_rt(); u33 = r33.eval('update')
 for _ in range(5): u33(0.016)
 check('radar_aspect=1.0' in open(INI).read(), 'migration runs only once (a later 1.0 stays)')
+
+# ---------------------------------------------------------------- v1.4.0: rename, ini carried over, enemy structures
+for f in ('sixth_sense.ini', 'rear_heat_hud.ini'):
+    if os.path.exists(LOGDIR + '/' + f): os.remove(LOGDIR + '/' + f)
+OLD = 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=11\narea_y0=22\narea_x1=933\narea_y1=744\nsensitivity=1.70\nrepeat_rate=0.60\ndot_size=large\nradar_fx=0.2\nradar_aspect=1.1\n'
+open(LOGDIR + '/rear_heat_hud.ini', 'w').write(OLD)
+r40 = radar_rt(); g40 = r40.globals(); u40 = r40.eval('update')
+for _ in range(3): u40(0.016)
+C40 = g40.HUD_CFG
+check(os.path.exists(INI) and open(INI).read().startswith(OLD), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
+check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
+lg40 = open(LOGDIR + '/sixth_sense.log').read()
+check('Sixth Sense 1.4.0 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
+r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
+check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
+open(INI, 'w').write('calibrate=false\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\nstatic_ids=abcdef0123456789\n')
+EXTRA40 = """
+TUR, ALT, LATE, TT, UNK, USER = {}, {}, {}, {}, {}, {}
+P = { [enemy] = {20, 20, 0}, [TUR] = {0, -20, 0}, [ALT] = {3, 3, 0}, [LATE] = {4, -4, 0}, [TT] = {20, 21, 0}, [UNK] = {-10, 10, 0}, [USER] = {-20, 0, 0} }
+NM = { [enemy] = "1a7fcdff98c664b0", [TUR] = "2cf3488c4845f8bd", [ALT] = "ef85d6cf58e31d70", [LATE] = "ff5cc825b9571052",
+       [TT] = "aeaef7a1851e6c9d", [UNK] = "0123abcd0123abcd", [USER] = "abcdef0123456789" }
+NOASM = { [TUR] = true, [ALT] = true, [LATE] = true, [TT] = true, [UNK] = true, [USER] = true }
+LIST = {cam, rt, enemy, TUR, ALT, TT, UNK, USER}
+ALIVE, MESH = {}, {}
+World.units = function() local r = {}; for i, u in ipairs(LIST) do r[i] = u end return r end
+World.units_by_resource = function(w, id) if id == "1a7fcdff98c664b0" then return {enemy} end return {} end
+Unit.resource_name = function(u) local h = NM[u] or (u == cam and "aaaaaaaaaaaaaaaa") or (u == rt and "46cab355bd8d4d37") or "1234567890abcdef"
+  return setmetatable({}, {__tostring = function() return "#ID[" .. h .. "]" end}) end
+Unit.alive = function(u) return ALIVE[u] ~= false end
+Unit.has_animation_state_machine = function(u) if u == cam or NOASM[u] then return false end return true end
+Unit.animation_get_state = function(u) if NOASM[u] then error("CRASH: state of a unit with no state machine") end return 5, 0, 0, 0 end
+Unit.mesh = function(u, i) return MESH[u] end
+Mesh = { visibility = function(m) return m.vis end }
+FR = 0
+Unit.world_position = function(u) if u == rt then error("CRASH") end
+  local p = P[u]; if not p then return stingray.Vector3(500, 500, 0) end
+  if NOASM[u] then return stingray.Vector3(p[1], p[2], p[3]) end
+  return stingray.Vector3(p[1] + 0.1 * math.sin(FR * 0.7), p[2], p[3]) end
+SQ = 0
+local oldrect = Gui.rect
+Gui.rect = function(g, p, sz, c) if c[2] == 255 and c[3] == 110 and c[4] == 20 then SQ = SQ + 1 end return oldrect(g, p, sz, c) end
+"""
+r42 = radar_rt(EXTRA40); u42 = r42.eval('update'); g42 = r42.globals()
+def run42(sec):
+    for _ in range(max(1, int(sec / 0.016))): r42.execute('FR = FR + 1; SQ = 0'); u42(0.016)
+while g42.HUD_S.px is None or g42.HUD_S.passes < 2: run42(0.1)
+r42.execute('table.insert(LIST, LATE)')      # a turret dropped in next to me after landing (a stratagem)
+run42(3.0)
+def e42(n): return g42.HUD_S.T[g42[n]]
+check(e42('TUR') is not None and e42('TUR').kind == 'static' and e42('TUR').show and e42('TUR').size == 'medium', 'Cannon Turret (no state machine, never moves) tracked as static, shown, medium')
+check(e42('USER') is not None and e42('USER').show, 'ini static_ids adds a structure')
+check(g42.SQ >= 6, 'structures drawn as orange-red diamonds (%d rects)' % g42.SQ)
+check(e42('ALT') is None, 'our gatling sentry (ef85d6cf58e31d70) never shown')
+check(e42('LATE') is None, 'a listed turret appearing near me after landing is taken as ours')
+check(e42('TT') is None, 'a turret on a tracked Tank (within 6 m) is not a second dot')
+lg42 = open(LOGDIR + '/sixth_sense.log').read()
+check('static?: 0123abcd0123abcd at 14 m' in lg42, 'unknown non-animated kind near me logged with its distance')
+check('static: 2cf3488c4845f8bd Cannon Turret at 20 m: shown' in lg42 and 'taken as ours' in lg42, 'shown and ours logged')
+check('CRASH' not in lg42 and 'error' not in lg42.lower().replace('last error nil', ''), 'no state asked of a unit without a state machine; no errors')
+# destroyed: first mesh hidden -> gone within 0.4 s; not alive -> gone
+r42.execute('MESH[TUR] = {vis = false}'); run42(0.4)
+check(e42('TUR') is None and g42.HUD_S.ghost[g42.TUR] is None, 'destroyed turret (mesh hidden) cleared within 0.4 s')
+r42.execute('ALIVE[USER] = false'); run42(0.4)
+check(e42('USER') is None, 'a structure no longer alive is dropped')
+os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)

@@ -1,4 +1,6 @@
-# Rear Heat HUD (HellForge / offline HD2 build 25480438)
+# Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
+
+*Sixth Sense v1.4.0 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -304,3 +306,19 @@ where the camera looks.
   - xlarge 2.2: Harvester, Leviathan, Factory and War Strider, Vox Engine
 
   Other known kinds go by tier (light tiny, medium medium, heavy large). A kind that is not in the size map is logged once as `size: <hex> ... (not in the size map)`.
+
+## v1.4.0: Sixth Sense
+- **Renamed** to Sixth Sense. The display name is "Sixth Sense v1.4.0" and the files are `sixth_sense.log`, `sixth_sense.ini` and `sixth_sense_discovery.txt`. The Lua module is `mods/darryl/sixth_sense`, the source is `src/sixth_sense.lua`, and the zips are `SixthSense.zip` and `SixthSense-no-texture.zip`. The GUID is unchanged, so HellForge updates the mod in place. The textures keep their v1.3 resource paths because the Lua names their ids.
+- **Settings carried over:** on the first load with no `sixth_sense.ini`, `rear_heat_hud.ini` is copied as it is (area, sliders, radar keys and migration flags), and the log says so. The old file stays where it is.
+- **Enemy structures** are drawn as orange-red diamonds at medium size. They are exempt from still-hide and from the fall filter. They wait 0.5 s like candidates before they show.
+  - Built-in list:
+    - Cannon Turret `2cf3488c4845f8bd` (`cyborg_turret_heavycannon`)
+    - AA/autocannon turret `aeaef7a1851e6c9d` (`cyborg_turret_autocannons`)
+    - Mortar turret `ff5cc825b9571052` (`cyborg_turret_mortar`)
+    - Bunker Turret `9926876b2375a1bb`
+  - Ids are hashes of the unit paths in the hashlist. Add more with `static_ids=` (16-digit hex, comma separated).
+  - A structure is removed when it is no longer alive, when its first mesh is hidden (Treasure Radar's destroyed test), when its death animation state shows (asked only of units that have a state machine), or when the walk has not found it for 10 s.
+  - The tank-turret paths are also the turrets on Tanks, so a turret within 6 m of a tracked known enemy is not drawn.
+  - `static_log=true` logs each unknown non-animated kind within range once, with its distance, as `static?: <hex> at N m`. Illuminate turrets have no path in the hashlist, so map them from that log.
+- **Our turrets are never shown.** The Helldiver stratagem turret ids are excluded (`gatling_turret`, `manned_turret`, `manned_turret_discoverable`, `turret_machinegun_gpmg`, `tutorial_turret`). A listed structure that first appears after the first full walk within 50 m of you is also taken as ours, since enemy structures are there from the start.
+- **Fixed slider panel:** in F7 calibration the sliders, labels and values sit at `panel_fx`/`panel_fy` (default 0.03, 0.08: top left), kept on screen. Dragging, the wheel and the arrows move only the radar. The clamp applies to the radar alone.
