@@ -336,8 +336,8 @@ check(p and abs(p[1] + 1) < 0.02 and p[3] < 240 * 0.5, 'beyond range (50 m of 40
 r7.execute('HUD_CFG.sensitivity = 2.0'); run7(0.1); p = dot7()
 check(p and abs(p[1] + 50 / 80) < 0.02 and p[3] >= 239, 'sensitivity 2: 50 m sits at 50/80 of the radius %s' % (p and '%.3f' % p[1]))
 r7.execute('HUD_CFG.sensitivity = 1.0')
-# dot sizes: small 6, medium 10, large 16 screen px (gui = px / 1.2 wide) at 1440 tall: x 1440/1080
-for name, px in (('small', 28 * 0.75), ('medium', 28), ('large', 28 * 1.35)):
+# dot sizes (v1.4.4): large class 44 px x 0.75/1/1.35 (gui = px / 1.2 wide) at 1440 tall: x 1440/1080
+for name, px in (('small', 44 * 0.75), ('medium', 44), ('large', 44 * 1.35)):
     r7.execute('HUD_CFG.dot_size = "%s"' % name); g7.EX, g7.EY = 0, 10; run7(0.05); p = dot7()
     want = math.floor(px * 1440 / 1080 / 1.2 * g7.SIXTH_SENSE_CAL.d / 0.35)   # (the stub enemy is a Charger: large, 22 px at medium; box() floors)
     check(p and abs(p[2] - want) <= 1, 'dot_size %s = %.1f px (large class, Charger) (gui w %.0f, want %d)' % (name, px, p[2] if p else -1, want))
@@ -532,7 +532,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.4.3 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.4.4 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -601,7 +601,7 @@ import re as _re
 lua = open('src/sixth_sense.lua').read()
 for h, want in (('67dc32dca4f02d33', 'large'), ('f22d027b37bef107', 'large'), ('965eae5a51acdd4a', 'xlarge'), ('d37e8d120d2836e3', 'xlarge'), ('78e1497571012c47', 'tiny')):
     m = _re.search(r'\["%s"\] = "(\w+)"' % h, lua); check(m and m.group(1) == want, 'size map %s -> %s' % (h, want))
-check('CLASS_PX = { tiny = 7, medium = 15, large = 28, xlarge = 38 }  -- v1.4.3: all dots larger' in lua and 'DOT_MUL = { small = 0.75, medium = 1.0, large = 1.35 }' in lua, 'base sizes 7/15/28/38 px, x 0.75/1/1.35')
+check('CLASS_PX = { tiny = 12, medium = 24, large = 44, xlarge = 58 }  -- v1.4.4: dots start out about twice as big' in lua and 'DOT_MUL = { small = 0.75, medium = 1.0, large = 1.35 }' in lua, 'base sizes 12/24/44/58 px, x 0.75/1/1.35')
 
 # ---------------------------------------------------------------- v1.4.2: load-time recovery
 open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=1.40\nradar_cy=0.30\nradar_d=0.30\n')
@@ -614,6 +614,53 @@ r61 = radar_rt(); u61 = r61.eval('update')
 for _ in range(220): u61(0.016)
 c61 = r61.globals().SIXTH_SENSE_CAL
 check(abs(c61.cx - 0.5) < 1e-9 and 'invalid position' in open(LOGDIR + '/sixth_sense.log').read(), 'load: an invalid position is reset')
+# ---------------------------------------------------------------- v1.4.4: dot migration, visibility
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=0.5\nradar_cy=0.7\nradar_d=0.35\ndot_size=small\n')
+r70 = radar_rt(); u70 = r70.eval('update'); g70 = r70.globals()
+for _ in range(220): u70(0.016)
+ini70 = open(INI).read(); v70 = dict(re.findall(r'^(\w+)=(.*)$', ini70, re.M))
+check(g70.HUD_CFG.dot_size == 'medium' and v70.get('dot_size') == 'medium' and v70.get('v144_migrated') == 'true' and v70.get('visibility') == 'always' and '; visibility (v1.4.4)' in ini70, 'v1.4.4 migration: saved small -> medium once, visibility=always written with its comment')
+g70.HUD_CFG.dot_size = 'small'; r71 = None
+open(INI, 'a').write('dot_size=small\n')
+r71 = radar_rt(); u71 = r71.eval('update')
+for _ in range(50): u71(0.016)
+check(r71.globals().HUD_CFG.dot_size == 'small', 'v144_migrated=true: small chosen afterwards is kept')
+def vis_rt(mode, extra=''):
+    open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nv144_migrated=true\nradar_cx=0.5\nradar_cy=0.7\nradar_d=0.35\nvisibility=%s\n' % mode)
+    rr = radar_rt(extra); uu = rr.eval('update')
+    for _ in range(220): uu(0.016)
+    return rr, uu
+rv, uv = vis_rt('hidden'); Iv = rv.globals().SIXTH_SENSE_RADAR; Iv.dots = -1
+uv(0.016); check(Iv.dots == -1, 'visibility=hidden: radar not drawn')
+rv.execute('PRESSED[1] = true'); uv(0.016); rv.execute('PRESSED = {}'); Iv.dots = -1
+for _ in range(5): uv(0.016)
+check(rv.globals().SIXTH_SENSE_CAL.on and Iv.dots >= 0, 'visibility=hidden: F7 page opens and shows the radar')
+rv, uv = vis_rt('hud'); Iv = rv.globals().SIXTH_SENSE_RADAR; Iv.dots = -1; uv(0.016)
+lgv = open(LOGDIR + '/sixth_sense.log').read()
+check(Iv.dots >= 0 and 'visibility: probe Application.user_setting hud_visible' in lgv and 'acting as always' in lgv, 'visibility=hud with no HUD source: probes logged, acts as always')
+rv, uv = vis_rt('hud', '\nHUDON = false\nlocal us = Application.user_setting\nApplication.user_setting = function(k) if k == "hud_visible" then return HUDON end if us then return us(k) end end')
+Iv = rv.globals().SIXTH_SENSE_RADAR; Iv.dots = -1; uv(0.016)
+check(Iv.dots == -1, 'visibility=hud, HUD hidden: radar not drawn')
+rv.execute('HUDON = true')
+for _ in range(100): uv(0.016)
+lgv = open(LOGDIR + '/sixth_sense.log').read()
+check(Iv.dots >= 0 and 'visibility: game HUD shown' in lgv, 'visibility=hud, HUD shown: radar drawn, change logged')
+# the visibility slider on the Settings tab (mouse)
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=true\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nv144_migrated=true\nradar_cx=0.5\nradar_cy=0.7\nradar_d=0.35\n')
+r11 = radar_rt(); u11 = r11.eval('update'); g11 = r11.globals()
+for _ in range(220): u11(0.016)
+click_tab(r11, 2); run11(0.5)
+tx, ty, tw, th = r11.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')(5)
+for frac, want in ((0.05, 'hidden'), (0.95, 'hud'), (0.5, 'always')):
+    g11.MX, g11.MY = to_window(tx + tw * 0.5, ty + th / 2); run11(0.02); g11.LMB = 1; run11(0.02)
+    g11.MX, g11.MY = to_window(tx + tw * frac, ty + th / 2); run11(0.05); g11.LMB = 0; run11(0.02)
+    check(g11.HUD_CFG.visibility == want, 'visibility slider at %.2f -> %s (%s)' % (frac, want, g11.HUD_CFG.visibility))
+g11.MX, g11.MY = to_window(tx + tw * 0.5, ty + th / 2); run11(0.02); g11.LMB = 1; run11(0.02)
+g11.MX, g11.MY = to_window(tx + tw * 0.05, ty + th / 2); run11(0.05); g11.LMB = 0; run11(1.0)
+check(dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get('visibility') == 'hidden', 'visibility saved to the ini')
+for k in (12, 13, 14, 15): r11.execute('PRESSED[%d] = true' % k); run11(0.02)
+check(g11.HUD_CFG.visibility == 'hidden', 'no key changes visibility')
+open(INI, 'w').write(open(INI).read().replace('visibility=hidden', 'visibility=always'))   # (the next run's smoke test draws)
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)

@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.2 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.4.4 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -346,3 +346,14 @@ where the camera looks.
   - The **Reset** button sits on both tabs. One click arms it (lit for 3 s); a second click within 3 s confirms. On Display it puts the radar back centred, 75% down the drawable area, at the default size. On Settings it restores the slider defaults (size, sensitivity, repeat rate, dot size). It saves at once and logs.
   - **Holding F7 for 3 s** resets the whole layout (radar and panel position) and leaves calibration on.
 - **Moving without the Move toggle** (which is gone): on the Display tab, drag the 4-way grab handle on the radar's top edge to move it, drag a corner handle to resize it about its centre, or use the wheel over the radar to resize. Clicks anywhere else on the radar do nothing, and the arrow keys still nudge. The panel stays on top and is re-placed when the radar is dropped or the Size slider is released.
+
+## v1.4.4 changes
+
+- Dots start out about twice as big: base sizes at 1080 tall are tiny 12, medium 24, large 44, extra large 58 px
+  (x0.75 / x1 / x1.35 for dot_size small / medium / large). A saved dot_size=small is reset to medium once
+  (v144_migrated).
+- New `visibility` setting: hidden, always, or hud (only while the game's HUD is shown). Set it with the green
+  3-way slider on the F7 page's Settings tab (mouse only). The F7 page always shows the radar, even when hidden.
+  hud mode probes for the game's HUD state (game globals, then Application.user_setting keys such as hud_visible)
+  and logs what it finds as `visibility:` lines in sixth_sense.log; if nothing answers, hud acts as always.
+  The default is always, because HUD detection is not confirmed on this build yet.
