@@ -20,7 +20,7 @@ Vector2=function(a,b) return {a,b} end
 Color=function(a,r,g,b) return {a,r,g,b} end
 Gui={rect=function() rects=rects+1 end, text=function() end}
 Application.main_world=function() return W end
-Application.back_buffer_size=function() return 2560,1440 end
+Application.back_buffer_size=function() return BBW or 2560, BBH or 1440 end
 stingray={Vector3=Vector3,Vector2=Vector2,Color=Color}
 Vector3=nil; Vector2={}
 ''')
@@ -35,7 +35,7 @@ os.makedirs(LOGDIR, exist_ok=True)
 INI = LOGDIR + '/sixth_sense.ini'
 if os.path.exists(INI): os.remove(INI)
 if os.path.exists(LOGDIR + '/rear_heat_hud.ini'): os.remove(LOGDIR + '/rear_heat_hud.ini')
-open(INI, 'w').write('calibrate=true\nbar_debug=true\narea_x0=300\narea_y0=200\narea_x1=1366.67\narea_y1=971.45\n')   # an older ini with a saved area (scale 0.5)
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=true\nbar_debug=true\narea_x0=300\narea_y0=200\narea_x1=1366.67\narea_y1=971.45\n')   # an older ini with a saved area (scale 0.5)
 SRC = open('src/sixth_sense.lua').read().replace('\\\\', '/')
 PRE = r'''
 MX, MY, LMB, WHEEL, DZ = 960, 540, 0, 0, {1, 0.05}
@@ -77,91 +77,85 @@ def key(name): r.execute('PRESSED[%d] = true' % {'f7':1,'left':2,'right':3,'up':
 fails = []
 def check(ok, what): print(('PASS ' if ok else 'FAIL ') + what); (None if ok else fails.append(what))
 frames(200)                              # settle + first draws
-a0 = area(); check(abs(a0[0] - 300) < 1e-6 and abs(a0[3] - 971.45) < 1e-6, 'the saved area loads unchanged from an older ini %s' % (a0,))
-SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end'); P0 = tuple(SLR(i) for i in (1, 4))
-# v1.4.1: with Move off (as F7 opens) a drag on the radar does nothing
-check(not r.eval('SIXTH_SENSE_MOVE()'), 'F7 open: Move is off')
-ax = area(); cx, cy = (ax[0] + ax[2]) / 2, (ax[1] + ax[3]) / 2 - 100
-G.MX, G.MY = to_window(cx, cy); frames(1); G.LMB = 1; frames(1); G.MX += 200; frames(2); G.LMB = 0; frames(1)
-G.WHEEL = 5; frames(1)
-check(area() == ax, 'Move off: drag and wheel leave the radar alone')
-click_tab(r, 3); check(r.eval('SIXTH_SENSE_MOVE()'), 'the Move button turns Move on')
-# drag inside the area: +200 window px right, +100 up
-cx, cy = (a0[0] + a0[2]) / 2, (a0[1] + a0[3]) / 2 - 100
-G.MX, G.MY = to_window(cx, cy); frames(2)
-G.LMB = 1; frames(1)
+# v1.4.2: the old gui area + radar_fx 0.5 / radar_fy 0.78 / radar_size 0.35 migrated once to screen fractions
+c = G.SIXTH_SENSE_CAL
+ecx = (300 + 0.5 * 1066.67) * SX / SW; ecy = (GT - (971.45 - 0.78 * 771.45)) * SY / SH; ed = 0.35 * 771.45 * SY / SH
+check(abs(c.cx - ecx) < 1e-4 and abs(c.cy - ecy) < 1e-4 and abs(c.d - ed) < 1e-4, 'migrated radar_cx %.4f radar_cy %.4f radar_d %.4f (want %.4f %.4f %.4f)' % (c.cx, c.cy, c.d, ecx, ecy, ed))
+ini = open(INI).read()
+check('v142_migrated=true' in ini and 'radar_cx=%.4f' % ecx in ini and 'area_x0=300' in ini, 'migration saved once; the old area keys left as they were')
+SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')
+GR = r.eval('function() return {SIXTH_SENSE_GRAB()} end')
+def grab(): return tuple(GR().values())
+def drag(x, y, dxw, dyw, n=10):
+    G.MX, G.MY = to_window(x, y); frames(1); G.LMB = 1; frames(1)
+    for _ in range(n): G.MX += dxw / n; G.MY += dyw / n; frames(1)
+    mid = tuple(SLR(i) for i in (1, 4)); G.LMB = 0; frames(1); return mid
+def fr(): return (c.cx, c.cy, c.d)
+# a drag on the radar away from the handles does nothing; the wheel away from the radar does nothing
+f0 = fr(); drag((c.x0 + c.x1) / 2 + 30, (c.y0 + c.y1) / 2 - 20, 200, 100)
+G.MX, G.MY = to_window(c.x1 + 200, c.y1 + 100); frames(1); G.WHEEL = 5; frames(1)
+check(fr() == f0, 'Display: a drag on the radar body and the wheel off the radar do nothing')
+# the grab handle moves it: +200 window px right, +100 up
 P0 = tuple(SLR(i) for i in (1, 4))
-for k in range(10):
-    G.MX += 20; G.MY += 10; frames(1)
-MID = tuple(SLR(i) for i in (1, 4))
-G.LMB = 0; frames(1)
-a1 = area(); dx = a1[0] - a0[0]; dy = a1[3] - a0[3]
-check(abs(dx - 200 * SW / RW / SX) < 1 and abs(dy - 100 * SH / RH / SY) < 1, 'drag moved the area by gui %.1f, %.1f (expected %.1f, %.1f)' % (dx, dy, 200 * SW / RW / SX, 100 * SH / RH / SY))
-check(abs(scale() - 0.5) < 1e-3, 'drag kept the scale')
-check(MID == P0, 'mid-drag the slider panel stays put (re-placed only on drop)')
-# wheel
-s0 = scale(); G.WHEEL = 3; upd(0.016); G.WHEEL = 0; frames(1)
-check(scale() > s0 * 1.05, 'wheel up scaled %.3f -> %.3f' % (s0, scale()))
-# +/- keys
-s0 = scale(); key('plus'); key('minus'); check(abs(scale() - s0) < 1e-12, '+/- keys no longer scale (mouse only)')
-# arrows, plain and with shift
-x0 = area()[0]; key('left'); check(abs(area()[0] - (x0 - 2 / SX)) < 1e-6, 'left arrow nudged 2 px')
-r.execute('HELD[6] = true'); x0 = area()[0]; key('right'); check(abs(area()[0] - (x0 + 20 / SX)) < 1e-6, 'shift+right nudged 20 px'); r.execute('HELD = {}')
-y1 = area()[3]; key('up'); check(abs(area()[3] - (y1 + 2 / SY)) < 1e-6, 'up arrow moved the area up (gui y +)')
-# v1.4.0 tabs: F7 opens on Display; in Settings the radar can't be dragged or resized
+gx_, gy_, gw_, gh_ = grab()
+mid = drag(gx_ + gw_ / 2, gy_ + gh_ / 2, 200, 100)
+check(abs(c.cx - (f0[0] + 200 / RW)) < 1e-3 and abs(c.cy - (f0[1] - 100 / RH)) < 1e-3 and c.d == f0[2], 'grab handle drag moved the radar by 200, 100 window px (%.4f, %.4f)' % (c.cx - f0[0], c.cy - f0[1]))
+check(mid == P0, 'mid-drag the slider panel stays put (re-placed only on drop)')
+check('ini: saved dropped' in open(LOGDIR + '/sixth_sense.log').read(), 'saved on drop')
+# the wheel over the radar resizes
+d0 = c.d; G.MX, G.MY = to_window((c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2); frames(1); G.WHEEL = 3; upd(0.016); G.WHEEL = 0; frames(1)
+check(c.d > d0 * 1.05, 'wheel over the radar resized %.3f -> %.3f' % (d0, c.d))
+# a corner handle resizes about the centre
+d0 = c.d; cx0 = c.cx; drag(c.x1 - 5 / SX, c.y0 + 5 / SY, -60, 60)
+check(c.d < d0 - 0.01 and abs(c.cx - cx0) < 1e-9, 'corner drag (inwards) resized %.3f -> %.3f about the centre' % (d0, c.d))
+s0 = c.d; key('plus'); key('minus'); check(abs(c.d - s0) < 1e-12, '+/- keys do not scale (mouse only)')
+x0 = c.x0; key('left'); check(abs(c.x0 - (x0 - 2 / SX)) < 1e-6, 'left arrow nudged 2 px')
+r.execute('HELD[6] = true'); x0 = c.x0; key('right'); check(abs(c.x0 - (x0 + 20 / SX)) < 1e-6, 'shift+right nudged 20 px'); r.execute('HELD = {}')
+y1 = c.y1; key('up'); check(abs(c.y1 - (y1 + 2 / SY)) < 1e-6, 'up arrow moved the radar up (gui y +)')
+# tabs: Settings: the handle, wheel and arrows do nothing
 check(tab(r) == 'display', 'calibration opens on the Display tab')
 click_tab(r, 2); check(tab(r) == 'settings', 'clicking the Settings tab switches to it')
-a0 = area(); ca = G.SIXTH_SENSE_CAL
-G.MX, G.MY = to_window((ca.x0 + ca.x1) / 2 + 30, (ca.y0 + ca.y1) / 2); frames(1); G.LMB = 1; frames(1)
-G.MX, G.MY = G.MX + 150, G.MY + 60; frames(3); G.LMB = 0; frames(1)
-G.WHEEL = 5; frames(1); key('left')
-check(area() == a0, 'Settings tab: drag, wheel and arrows leave the radar where it is')
-click_tab(r, 1); check(tab(r) == 'display', 'clicking the Display tab switches back')
-check(not r.eval('SIXTH_SENSE_MOVE()'), 'a tab switch turned Move off')
-click_tab(r, 3)
-G.MX, G.MY = to_window((ca.x0 + ca.x1) / 2 + 30, (ca.y0 + ca.y1) / 2); frames(1); G.LMB = 1; frames(1)
-G.MX = G.MX + 100; frames(3); G.LMB = 0; frames(1)
-check(area()[0] > a0[0] + 1, 'Display tab: drag moves the radar')
-G.WHEEL = 5; frames(1); check(abs((area()[2] - area()[0]) - (a0[2] - a0[0])) > 1, 'Display tab: the wheel resizes the radar')
-G.WHEEL = -5; frames(1); G.MX, G.MY = to_window((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2); frames(1); G.LMB = 1; frames(1); G.MX -= 100 * RW / SW * SX; frames(2); G.LMB = 0; frames(1)
-click_tab(r, 3); check(not r.eval('SIXTH_SENSE_MOVE()') and 'move off (button)' in open(LOGDIR + '/sixth_sense.log').read(), 'a second click turns Move off and saves')
-click_tab(r, 3); key('f7'); key('f7'); check(tab(r) == 'display' and not r.eval('SIXTH_SENSE_MOVE()'), 'F7 reopens on Display with Move off')
-click_tab(r, 2)
-# slider: press on the knob, drag right
-c = G.SIXTH_SENSE_CAL
-w, h = 600 / SX, 16 / SY
-SLR = r.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')
-tx, ty, _w, _h = SLR(1)
+f0 = fr(); gx_, gy_, gw_, gh_ = grab(); drag(gx_ + gw_ / 2, gy_ + gh_ / 2, 150, 60)
+G.MX, G.MY = to_window((c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2); frames(1); G.WHEEL = 5; frames(1); key('left')
+check(fr() == f0, 'Settings tab: the handle, wheel and arrows leave the radar where it is')
+# the Size slider sets the diameter
+tx, ty, tw, th = SLR(1)
+kx = tx + tw * (c.d - 0.08) / (1.0 - 0.08)
+G.MX, G.MY = to_window(kx, ty + th / 2); frames(1); G.LMB = 1; frames(1)
+G.MX, G.MY = to_window(tx + tw * 0.3, ty + th / 2); frames(3); MIDS = tuple(SLR(1)); G.LMB = 0; frames(1)
+check(abs(c.d - (0.08 + 0.92 * 0.3)) < 0.01, 'Size slider set the diameter to %.3f' % c.d)
+check(MIDS == (tx, ty, tw, th), 'the panel stays put while the Size slider is dragged')
 PN = tuple(r.eval('function() return {SIXTH_SENSE_PANEL()} end')().values())
-ar = area()
-ov = max(0, min(PN[4], ar[2]) - max(PN[2], ar[0])) * max(0, min(PN[5], ar[3]) - max(PN[3], ar[1]))
-check(abs(tx - (PN[0] * c.bw + 150 / SX)) < 1e-6 , 'slider panel at its placed spot %.2f, %.2f (%.1f, %.1f)' % (PN[0], PN[1], tx, ty))
+ov = max(0, min(PN[4], c.x1) - max(PN[2], c.x0)) * max(0, min(PN[5], c.y1) - max(PN[3], c.y0))
 check(ov == 0 or 'least' in open(LOGDIR + '/sixth_sense.log').read(), 'the panel was placed off the radar (overlap %.0f)' % ov)
-kx = tx + w * (scale() - 0.25) / (2.5 - 0.25)
-G.MX, G.MY = to_window(kx, ty + h / 2); frames(1)
-G.LMB = 1; frames(1); s0 = scale(); area_before = area()
-G.MX, G.MY = to_window(tx + w * 0.3, ty + h / 2); frames(3)
-G.LMB = 0; frames(1)
-check(tuple(SLR(1)) == (tx, ty, _w, _h) or abs(SLR(1)[0] - tx) < 1e-9, 'the panel did not move with the scale change')
-check(abs(scale() - (0.25 + 2.25 * 0.3)) < 0.02, 'slider drag set the scale %.3f -> %.3f' % (s0, scale()))
-ca = ((area_before[0] + area_before[2]) / 2, (area_before[1] + area_before[3]) / 2); cb = ((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2)
-check(('area clamped (scale)' in open(LOGDIR + '/sixth_sense.log').read()) or abs(ca[0] - cb[0]) < 1e-3 and abs(ca[1] - cb[1]) < 1e-3, 'slider scaled around the centre (or was clamped)')
-check(area()[1] >= -1e-6 and area()[2] <= c.bw + 1e-6, 'after scaling: bottom >= 0 and right <= visible width (%.1f, %.1f)' % (area()[1], area()[2]))
-# drag far down and right: clamped
-click_tab(r, 1); click_tab(r, 3)
-s_before = scale(); G.MX, G.MY = to_window((area()[0] + area()[2]) / 2, (area()[1] + area()[3]) / 2); frames(1); G.LMB = 1; frames(1)
-for k in range(20): G.MY -= 40; G.MX += 40; frames(1)
-G.LMB = 0; frames(1)
-check(abs(area()[1]) < 1e-6 or area()[1] > 0, 'drag down: bottom clamped at gy %.2f' % area()[1])
-check(area()[2] <= c.bw + 1e-6, 'drag right: right edge clamped at gx %.1f (max %.1f)' % (area()[2], c.bw))
+# Reset on Settings: slider defaults (two clicks)
+RS = r.eval('SIXTH_SENSE_RESET')
+click_tab(r, 3); check(RS() and abs(c.d - (0.08 + 0.92 * 0.3)) < 0.01, 'Reset: one click only arms it')
+click_tab(r, 3); ini = open(INI).read()
+check(not RS() and abs(c.d - 0.35) < 1e-9 and 'sensitivity=1.00' in ini and 'dot_size=medium' in ini and 'reset (Settings, confirmed)' in open(LOGDIR + '/sixth_sense.log').read(), 'Reset confirmed on Settings: slider defaults, saved and logged')
+click_tab(r, 1)
+# Reset on Display: armed expires after 3 s; confirmed -> centred, 75% down, default size
+gx_, gy_, gw_, gh_ = grab(); drag(gx_ + gw_ / 2, gy_ + gh_ / 2, -150, 80)
+f0 = fr(); click_tab(r, 3); frames(int(3.2 / 0.016)); click_tab(r, 3)
+check(fr() == f0 and RS(), 'Reset: a second click after 3 s only re-arms')
+click_tab(r, 3); yb = min(1, GT * SY / SH)
+check(abs(c.cx - 0.5) < 1e-6 and abs(c.cy - 0.75 * yb) < 1e-4 and abs(c.d - 0.35) < 1e-6 and 'radar_cx=0.5000' in open(INI).read(), 'Reset confirmed on Display: centred, 75%% down, default size, saved (%.3f, %.3f)' % (c.cx, c.cy))
+# drag far down and right: clamped inside the drawable screen
+gx_, gy_, gw_, gh_ = grab(); drag(gx_ + gw_ / 2, gy_ + gh_ / 2, 800, -800, 20)
+check(c.y0 >= -1e-6 and c.x1 <= c.bw + 1e-6, 'drag down-right: clamped (bottom gy %.2f, right %.1f of %.1f)' % (c.y0, c.x1, c.bw))
 lg = open(LOGDIR + '/sixth_sense.log').read()
 check('drawable gui bounds' in lg and 'area clamped (move)' in lg, 'bounds and clamp logged')
-# the ini gets the area after the 0.5 s throttle
+# resolution change: 2560x1440 -> 3840x1080: same screen fractions, new transform logged
+f0 = fr(); G.BBW, G.BBH = 3840, 1080; frames(70)
+check(abs(c.cx - f0[0]) < 1e-9 and abs(c.cy - f0[1]) < 0.01 and 'transform (resolution change from 2560x1440): screen 3840x1080' in open(LOGDIR + '/sixth_sense.log').read(), 'resolution change: the radar keeps its screen fractions; transform logged')
+check(abs(c.bw - 3840 / (1.2 * 1080 / 1440)) < 1e-6, 'height model: sx_scale scales with the height (visible gui %.1f wide)' % c.bw)
+G.BBW, G.BBH = None, None; frames(70)
+# F7 held 3 s: the whole layout reset
+gx_, gy_, gw_, gh_ = grab(); drag(gx_ + gw_ / 2, gy_ + gh_ / 2, -200, 50)
+r.execute('HELD[1] = true'); frames(int(3.2 / 0.016)); r.execute('HELD = {}'); frames(1)
+check(abs(c.cx - 0.5) < 1e-9 and c.on and 'layout reset (F7 held 3 s)' in open(LOGDIR + '/sixth_sense.log').read(), 'F7 held 3 s: layout reset, calibration on')
 frames(40)
-ini = open(INI).read()
-vals = {k: float(v) for k, v in re.findall(r'^(area_\w+)=([-\d.]+)', ini, re.M)}
 a = area()
-check(all(abs(vals['area_' + k] - v) < 0.01 for k, v in zip(('x0', 'y0', 'x1', 'y1'), a)) and abs(vals['area_scale'] - scale()) < 1e-3, 'ini has the area %s' % vals)
 # F8: off, saved, mouse given back, only the bars drawn
 key('f7'); ini = open(INI).read()
 check('calibrate=false' in ini and 'toggle_key=f7' in ini, 'F7 saved calibrate=false')
@@ -232,7 +226,7 @@ check(re.search(r'nearest 1a7fcdff98c664b0 known .* bearing [-+]\d+ \((left|righ
 ini2 = open(INI).read()
 check(all(k in ini2 for k in ('area_x0=', 'area_y0=', 'area_x1=', 'area_y1=')), 'area keys still in the ini')
 # ---------------------------------------------------------------- v1.2: sensitivity and repeat_rate
-open(INI, 'w').write('calibrate=true\nbar_debug=false\nv110_migrated=true\nrange=40\narea_x0=300\narea_y0=200\narea_x1=1366.67\narea_y1=971.45\narea_scale=0.5\nswap_sides=false\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=true\nbar_debug=false\nv110_migrated=true\nrange=40\narea_x0=300\narea_y0=200\narea_x1=1366.67\narea_y1=971.45\narea_scale=0.5\nswap_sides=false\n')
 r5 = runtime(); r5.execute('''
 EX, EY = 0, -10
 Unit.world_position = function(u) if u == rt then error("CRASH") end if u == enemy then JIT = (JIT or 0) + 1; return stingray.Vector3(EX + 0.1 * math.sin(JIT * 0.7), EY, 0) end return stingray.Vector3(50, 50, 0) end
@@ -288,7 +282,7 @@ check(0 < n0 <= 0.25 + 1e-6, 'rate 2: known enemies re-acquired every 0.25 s (ne
 r5.execute('HUD_CFG.sensitivity = 1.55; HUD_CFG.repeat_rate = 0.8; SIXTH_SENSE_CAL.dirty = true'); run5(1.0)
 ini5 = open(INI).read(); vals = dict(re.findall(r'^(\w+)=(.*)$', ini5, re.M))
 check(vals.get('sensitivity') == '1.55' and vals.get('repeat_rate') == '0.80', 'ini has sensitivity %s repeat_rate %s' % (vals.get('sensitivity'), vals.get('repeat_rate')))
-check(abs(float(vals['area_x0']) - c5.x0) < 0.01 and abs(float(vals['area_x0']) - 300) < 0.01 and abs(float(vals['area_y1']) - 971.45) < 0.01 and vals.get('range') == '40' and vals.get('swap_sides') == 'false', 'area and other ini keys untouched')
+check('radar_cx' in vals and abs(float(vals['area_x0']) - 300) < 0.01 and abs(float(vals['area_y1']) - 971.45) < 0.01 and vals.get('range') == '40' and vals.get('swap_sides') == 'false', 'area and other ini keys untouched')
 lg = open(LOGDIR + '/sixth_sense.log').read()
 r6 = runtime(); r6.execute('''local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end
 HUD_CFG = find(find(update, "step"), "CFG")''')
@@ -296,7 +290,7 @@ C6 = r6.globals().HUD_CFG
 check(abs(C6.sensitivity - 1.55) < 1e-9 and abs(C6.repeat_rate - 0.8) < 1e-9, 'restart loads sensitivity and repeat_rate from the ini')
 check('settings changed: sensitivity' in lg and 'sens_' not in lg and 'input: key plus' not in lg, 'settings logged; no slider key lookups')
 # ---------------------------------------------------------------- v1.3: the radar
-open(INI, 'w').write('calibrate=false\nv110_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\narea_scale=1\nsensitivity=1.00\nrepeat_rate=1.00\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\narea_scale=1\nsensitivity=1.00\nrepeat_rate=1.00\n')
 def radar_rt(extra=''):
     rr = runtime(); rr.execute('''
 EX, EY, EALIVE = 0, 20, true
@@ -345,7 +339,7 @@ r7.execute('HUD_CFG.sensitivity = 1.0')
 # dot sizes: small 6, medium 10, large 16 screen px (gui = px / 1.2 wide) at 1440 tall: x 1440/1080
 for name, px in (('small', 22 * 0.75), ('medium', 22), ('large', 22 * 1.35)):
     r7.execute('HUD_CFG.dot_size = "%s"' % name); g7.EX, g7.EY = 0, 10; run7(0.05); p = dot7()
-    want = math.floor(px * 1440 / 1080 / 1.2)   # (the stub enemy is a Charger: large, 22 px at medium; box() floors)
+    want = math.floor(px * 1440 / 1080 / 1.2 * g7.SIXTH_SENSE_CAL.d / 0.35)   # (the stub enemy is a Charger: large, 22 px at medium; box() floors)
     check(p and abs(p[2] - want) <= 1, 'dot_size %s = %.1f px (large class, Charger) (gui w %.0f, want %d)' % (name, px, p[2] if p else -1, want))
 r7.execute('HUD_CFG.dot_size = "medium"')
 # lost: lingers for the hold, then fades, then goes
@@ -403,7 +397,7 @@ check(v11.get('dot_size') == 'large' and v11.get('area_x1') == '2133.33' and v11
 for k in (12, 13, 14, 15): r11.execute('PRESSED[%d] = true' % k); run11(0.02)
 check(C11.dot_size == 'large', 'no key changes dot_size')
 # ---------------------------------------------------------------- v1.3.1: round disc, labels
-open(INI, 'w').write('calibrate=true\nv110_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\narea_scale=1\nradar_fx=0.3\nradar_fy=0.6\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=true\nv110_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\narea_scale=1\nradar_fx=0.3\nradar_fy=0.6\n')
 EXTRA2 = EXTRA.replace('Gui.material = function(g, id) return {mat = id} end', 'TEXOF = {}\nGui.material = function(g, id) return g end').replace(
   'Material = {set_texture = function(m, slot, tex) SET = {slot, tex} end}', 'Material = {set_texture = function(m, slot, tex) SET = {slot, tex}; TEXOF[m] = tex end}').replace(
   'Gui.bitmap = function(g, mat, p, sz, c) BITMAPS = BITMAPS + 1 end',
@@ -442,14 +436,14 @@ lg13 = open(LOGDIR + '/sixth_sense.log').read()
 check('error' not in lg13.lower().replace('last error nil', ''), 'no errors in the log')
 # calibrate off: no labels, no slider drawing
 r14 = radar_rt(EXTRA2); r14.execute('BMCOUNT = 0'); u14 = r14.eval('update')
-open(INI, 'w').write('calibrate=false\nv110_migrated=true\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\n')
 r14 = radar_rt(EXTRA2); u14 = r14.eval('update')
 for _ in range(260): u14(0.016)
 check(len(list(r14.globals().SIXTH_SENSE_LABELS.keys())) == 0 and list(r14.globals().BM.keys()) == ['03c798e2775e07a4'], 'calibrate off: only the disc bitmap, no labels')
 # pixel font sanity: every glyph is 35 cells
 
 # ---------------------------------------------------------------- v1.3.2: pods, fallers, persistence, death, sizes, aspect migration
-open(INI, 'w').write('calibrate=false\nv110_migrated=true\nrange=40\narea_x0=10\narea_y0=20\narea_x1=900\narea_y1=700\narea_scale=1\nsensitivity=1.00\nrepeat_rate=1.00\nradar_fx=0.4\nradar_fy=0.7\nradar_size=0.3\nradar_aspect=1.0\nignore_ids=3828e2051aa9e897\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nrange=40\narea_x0=10\narea_y0=20\narea_x1=900\narea_y1=700\narea_scale=1\nsensitivity=1.00\nrepeat_rate=1.00\nradar_fx=0.4\nradar_fy=0.7\nradar_size=0.3\nradar_aspect=1.0\nignore_ids=3828e2051aa9e897\n')
 EXTRA32 = """
 POD, STR, FALL, CAND, IGN, VOT, HARV = {}, {}, {}, {}, {}, {}, {}
 P = { [enemy] = {0, -20, 0}, [POD] = {3, -15, 0}, [STR] = {-10, -10, 30}, [FALL] = {10, -10, 40}, [CAND] = {-15, -5, 0},
@@ -522,7 +516,7 @@ check(ent('CAND').show, 'it shows again once it moves')
 ini = open(INI).read()
 check('radar_aspect=1.25' in ini and 'v132_migrated=true' in ini, 'ini radar_aspect 1.0 migrated to 1.25 once')
 check(all(k in ini for k in ('area_x0=10', 'area_y0=20', 'area_x1=900', 'area_y1=700', 'radar_fx=0.4', 'radar_fy=0.7', 'radar_size=0.3', 'sensitivity=1.00', 'repeat_rate=1.00')), 'placement, sensitivity and repeat_rate keys untouched')
-open(INI, 'w').write(ini.replace('radar_aspect=1.25', 'radar_aspect=1.0'))
+open(INI, 'w').write('transform_ref_h=1440\n' + ini.replace('radar_aspect=1.25', 'radar_aspect=1.0'))
 r33 = radar_rt(); u33 = r33.eval('update')
 for _ in range(5): u33(0.016)
 check('radar_aspect=1.0' in open(INI).read(), 'migration runs only once (a later 1.0 stays)')
@@ -531,18 +525,18 @@ check('radar_aspect=1.0' in open(INI).read(), 'migration runs only once (a later
 for f in ('sixth_sense.ini', 'rear_heat_hud.ini'):
     if os.path.exists(LOGDIR + '/' + f): os.remove(LOGDIR + '/' + f)
 OLD = 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=11\narea_y0=22\narea_x1=933\narea_y1=744\nsensitivity=1.70\nrepeat_rate=0.60\ndot_size=large\nradar_fx=0.2\nradar_aspect=1.1\n'
-open(LOGDIR + '/rear_heat_hud.ini', 'w').write(OLD)
+open(LOGDIR + '/rear_heat_hud.ini', 'w').write('transform_ref_h=1440\n' + OLD)
 r40 = radar_rt(); g40 = r40.globals(); u40 = r40.eval('update')
 for _ in range(3): u40(0.016)
 C40 = g40.HUD_CFG
-check(os.path.exists(INI) and open(INI).read().startswith(OLD), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
+check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.4.1 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.4.2 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
-open(INI, 'w').write('calibrate=false\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\nstatic_ids=abcdef0123456789\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=0\narea_y0=0\narea_x1=2133.33\narea_y1=1080\nstatic_ids=abcdef0123456789\n')
 EXTRA40 = """
 TUR, ALT, LATE, TT, UNK, USER = {}, {}, {}, {}, {}, {}
 P = { [enemy] = {20, 20, 0}, [TUR] = {0, -20, 0}, [ALT] = {3, 3, 0}, [LATE] = {4, -4, 0}, [TT] = {20, 21, 0}, [UNK] = {-10, 10, 0}, [USER] = {-20, 0, 0} }
@@ -593,7 +587,7 @@ r42.execute('ALIVE[USER] = false'); run42(0.4)
 check(e42('USER') is None, 'a structure no longer alive is dropped')
 
 # ---------------------------------------------------------------- v1.4.1: panel on top and placed off the radar; size spread
-open(INI, 'w').write('calibrate=true\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=0\narea_y0=600\narea_x1=900\narea_y1=1080\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=true\nv110_migrated=true\nv132_migrated=true\nrange=40\narea_x0=0\narea_y0=600\narea_x1=900\narea_y1=1080\n')
 r50 = radar_rt('\nLAYERS = {}\nlocal oldr = Gui.rect\nGui.rect = function(g, p, sz, c) LAYERS[#LAYERS + 1] = p[3]; return oldr(g, p, sz, c) end')
 u50 = r50.eval('update'); g50 = r50.globals()
 for _ in range(220): u50(0.016)
@@ -608,6 +602,18 @@ lua = open('src/sixth_sense.lua').read()
 for h, want in (('67dc32dca4f02d33', 'large'), ('f22d027b37bef107', 'large'), ('965eae5a51acdd4a', 'xlarge'), ('d37e8d120d2836e3', 'xlarge'), ('78e1497571012c47', 'tiny')):
     m = _re.search(r'\["%s"\] = "(\w+)"' % h, lua); check(m and m.group(1) == want, 'size map %s -> %s' % (h, want))
 check('CLASS_PX = { tiny = 5, medium = 11, large = 22, xlarge = 30 }' in lua and 'DOT_MUL = { small = 0.75, medium = 1.0, large = 1.35 }' in lua, 'base sizes 5/11/22/30 px, x 0.75/1/1.35')
+
+# ---------------------------------------------------------------- v1.4.2: load-time recovery
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=1.40\nradar_cy=0.30\nradar_d=0.30\n')
+r60 = radar_rt(); u60 = r60.eval('update')
+for _ in range(220): u60(0.016)
+c60 = r60.globals().SIXTH_SENSE_CAL
+check(c60.x1 <= c60.bw + 1e-6 and c60.cx < 1 and 'area clamped (load)' in open(LOGDIR + '/sixth_sense.log').read(), 'load: an offscreen radar (radar_cx 1.4) is clamped back in (%.3f)' % c60.cx)
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=9\nradar_cy=0.30\nradar_d=0.30\n')
+r61 = radar_rt(); u61 = r61.eval('update')
+for _ in range(220): u61(0.016)
+c61 = r61.globals().SIXTH_SENSE_CAL
+check(abs(c61.cx - 0.5) < 1e-9 and 'invalid position' in open(LOGDIR + '/sixth_sense.log').read(), 'load: an invalid position is reset')
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)

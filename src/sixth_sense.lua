@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.4.1 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.4.2 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.4.1"
+local MOD, VERSION = "sixth_sense", "1.4.2"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -83,7 +83,7 @@ local function say(s)
 end
 
 -- ---------------------------------------------------------------- config
-local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
+local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
               detect = "both", discovery = true, discovery_static = false, discovery_range = 80, candidate_weight = 1.5,
               debug = false }
 local CFG_TEXT = [[
@@ -159,6 +159,13 @@ static_log=true
 ; the top). It stays there: dragging moves only the radar.
 panel_fx=0.03
 panel_fy=0.08
+; v1.4.2 radar placement, resolution independent: radar_cx, radar_cy = the radar's centre as fractions of the visible
+; screen (cy from the top), radar_d = its diameter as a fraction of the screen height. Written by calibration; the
+; area_* / radar_fx / radar_fy / radar_size keys were converted into these once (v142_migrated) and are no longer used.
+; transform_scale: height (sx_scale/sy_scale were measured at transform_ref_h tall and scale with the screen height,
+; i.e. a 1080-tall-normalised gui) or fixed (the old way: the same numbers at every resolution).
+transform_scale=height
+transform_ref_h=1080
 ; tex_size_px: true (v1.3.1) sizes textures in screen px, which fixes v1.3's tall, skinny disc. false = v1.3's way.
 tex_size_px=true
 ; label_style: slider labels in calibration. auto (word textures, then a rect pixel font), texture, pixel, or off.
@@ -215,7 +222,10 @@ do
   CFG.discovery_range = clamp(CFG.discovery_range, 10, 300); CFG.candidate_weight = clamp(CFG.candidate_weight, 0, 10)
   if CFG.detect ~= "list" and CFG.detect ~= "candidates" then CFG.detect = "both" end
   CFG.panel_fx = clamp(CFG.panel_fx, 0, 0.9); CFG.panel_fy = clamp(CFG.panel_fy, 0, 0.9)
+  if CFG.transform_ref_h <= 0 then CFG.transform_ref_h = 1080 end
+  CFG.transform_scale = tostring(CFG.transform_scale):lower() == "fixed" and "fixed" or "height"
 end
+local XF_REF = { sx = CFG.sx_scale, sy = CFG.sy_scale }   -- (as measured, at transform_ref_h tall)
 
 -- ---------------------------------------------------------------- known enemies: resource id -> tier (1 light, 2 medium, 3 heavy)
 -- From Treasure Radar 0.7.x (2026 build). Resource ids are hashes of the unit's file path, so a unit whose path did not
@@ -992,45 +1002,97 @@ end
 -- the placement area, in gui units (gui y runs up: y1 is the top edge, y0 the bottom)
 local CAL = { x0 = nil, y0 = nil, x1 = nil, y1 = nil, bw = nil, bh = nil, drag = nil, dirty = false, last_save = -1, on = false }
 _G.SIXTH_SENSE_CAL = CAL                          -- (read by the stub test)
-local SMIN, SMAX = 0.25, 2.5
--- the game clips gui drawing below gy 0, and the visible gui ends at gx = screen width / sx_scale (3200 at 3840 wide)
-local function clamp_area(why)
-  local dx, dy = 0, 0
-  if CAL.y0 < 0 then dy = -CAL.y0 end
-  if CAL.x1 > CAL.bw then dx = CAL.bw - CAL.x1 end
-  if dx ~= 0 or dy ~= 0 then
-    CAL.x0, CAL.x1, CAL.y0, CAL.y1 = CAL.x0 + dx, CAL.x1 + dx, CAL.y0 + dy, CAL.y1 + dy
-    if S.t >= (CAL.clamp_log or 0) then
-      CAL.clamp_log = S.t + 0.5
-      say(string.format("area clamped (%s): shifted gui %.1f, %.1f to keep bottom >= 0 and right <= %.1f", why, dx, dy, CAL.bw))
-    end
-  end
+local SMIN, SMAX
+-- v1.4.2 placement: the radar's centre (CAL.cx, CAL.cy) and diameter (CAL.d) as fractions of the visible screen
+-- (cy from the top, d of the screen height). The gui-unit box CAL.x0..y1 (the radar's bounding box) is derived from
+-- them each time through the current transform, so a resolution change keeps the radar where it was on screen.
+local D_DEF = 0.35
+SMIN, SMAX = 0.08, 1.0
+-- the transform for this back buffer: sx/sy measured at transform_ref_h tall, scaled with the height (gui space
+-- normalised to the height) unless transform_scale=fixed
+local function apply_xf(sw, sh, why)
+  local k = CFG.transform_scale == "height" and sh / CFG.transform_ref_h or 1
+  CFG.sx_scale, CFG.sy_scale = XF_REF.sx * k, XF_REF.sy * k
+  CAL.sw, CAL.sh = sw, sh
+  CAL.bw, CAL.bh = sw / CFG.sx_scale, sh / CFG.sy_scale
+  say(string.format("transform (%s): screen %dx%d, model %s (ref %.4f/%.4f at %d tall) -> sx %.4f sy %.4f gy_top %.1f; visible gui x 0..%.1f, y %.1f..%.1f; drawable bottom at %.3f of the screen",
+    why, sw, sh, CFG.transform_scale, XF_REF.sx, XF_REF.sy, CFG.transform_ref_h, CFG.sx_scale, CFG.sy_scale, CFG.gy_top, CAL.bw, CFG.gy_top, CFG.gy_top - CAL.bh,
+    math.min(1, CFG.gy_top * CFG.sy_scale / sh)))
 end
-local function cal_scale() return (CAL.x1 - CAL.x0) / CAL.bw end
+local function ybot() return math.min(1, CFG.gy_top * CFG.sy_scale / CAL.sh) end   -- the game clips gui below gy 0
+local function derive()
+  local SX, SY, GT = CFG.sx_scale, CFG.sy_scale, CFG.gy_top
+  local rpx = CAL.d * CAL.sh / 2
+  local wpx = rpx * CFG.radar_aspect
+  local cxp, cyp = CAL.cx * CAL.sw, CAL.cy * CAL.sh
+  CAL.x0, CAL.x1 = (cxp - wpx) / SX, (cxp + wpx) / SX
+  CAL.y1, CAL.y0 = GT - (cyp - rpx) / SY, GT - (cyp + rpx) / SY
+end
+local function clamp_area(why)
+  local yb = ybot()
+  local dmax = 0.98 * math.min(yb, CAL.sw / (CAL.sh * CFG.radar_aspect))
+  local d = clamp(CAL.d, 0.05, dmax)
+  local hw, hh = d * CAL.sh / 2 * CFG.radar_aspect / CAL.sw, d / 2
+  local cx, cy = clamp(CAL.cx, hw, 1 - hw), clamp(CAL.cy, hh, yb - hh)
+  if math.abs(cx - CAL.cx) > 1e-6 or math.abs(cy - CAL.cy) > 1e-6 or math.abs(d - CAL.d) > 1e-6 then
+    CAL.clamp_log = CAL.clamp_log or {}
+    if S.t >= (CAL.clamp_log[why] or 0) then
+      CAL.clamp_log[why] = S.t + 0.5
+      say(string.format("area clamped (%s): centre %.3f,%.3f -> %.3f,%.3f, diameter %.3f -> %.3f (kept inside the drawable screen, bottom %.3f)", why, CAL.cx, CAL.cy, cx, cy, CAL.d, d, yb))
+    end
+    CAL.cx, CAL.cy, CAL.d = cx, cy, d
+  end
+  derive()
+end
+local function valid_pos() return type(CAL.cx) == "number" and CAL.cx == CAL.cx and CAL.cy == CAL.cy and CAL.d == CAL.d
+  and CAL.cx > -0.5 and CAL.cx < 1.5 and CAL.cy > -0.5 and CAL.cy < 1.5 and CAL.d > 0.02 and CAL.d < 1.5 end
+local function reset_pos(why)
+  CAL.cx, CAL.cy, CAL.d = 0.5, 0.75 * ybot(), D_DEF
+  clamp_area("reset"); CAL.dirty = true
+  say(string.format("reset (%s): radar centred at %.3f, %.3f of the screen, diameter %.2f", why, CAL.cx, CAL.cy, CAL.d))
+end
+-- on load and on a resolution change: clamp back in; reset if still invalid
+local function sanity(why)
+  if not valid_pos() then reset_pos(why .. ": invalid position") return end
+  clamp_area(why)
+  if not valid_pos() then reset_pos(why .. ": invalid after clamping") end
+end
+local function cal_scale() return CAL.d end
 local function set_scale(s)
-  s = clamp(s, SMIN, SMAX)
-  local cx, cy = (CAL.x0 + CAL.x1) / 2, (CAL.y0 + CAL.y1) / 2
-  local w, h = CAL.bw * s, CAL.bh * s
-  CAL.x0, CAL.x1, CAL.y0, CAL.y1 = cx - w / 2, cx + w / 2, cy - h / 2, cy + h / 2
+  CAL.d = clamp(s, SMIN, SMAX)
   clamp_area("scale")
   CAL.dirty = true
 end
 local function move_by(dx, dy)
-  CAL.x0, CAL.x1, CAL.y0, CAL.y1 = CAL.x0 + dx, CAL.x1 + dx, CAL.y0 + dy, CAL.y1 + dy
+  CAL.cx = CAL.cx + dx * CFG.sx_scale / CAL.sw
+  CAL.cy = CAL.cy - dy * CFG.sy_scale / CAL.sh
   clamp_area("move")
   CAL.dirty = true
 end
 local function cal_init(sw, sh)
-  CAL.bw, CAL.bh = sw / CFG.sx_scale, sh / CFG.sy_scale
-  if CFG.area_x1 > CFG.area_x0 and CFG.area_y1 > CFG.area_y0 then
-    CAL.x0, CAL.y0, CAL.x1, CAL.y1 = CFG.area_x0, CFG.area_y0, CFG.area_x1, CFG.area_y1
-    say(string.format("area: loaded from the ini (scale %.3f)", cal_scale()))
+  apply_xf(sw, sh, "load")
+  if CFG.radar_cx >= 0 and CFG.radar_cy >= 0 and CFG.radar_d > 0 then
+    CAL.cx, CAL.cy, CAL.d = CFG.radar_cx, CFG.radar_cy, CFG.radar_d
+    say(string.format("radar: loaded from the ini: centre %.3f, %.3f of the screen, diameter %.3f", CAL.cx, CAL.cy, CAL.d))
   else
-    CAL.x0, CAL.x1, CAL.y1 = 0, CAL.bw, CFG.gy_top
-    CAL.y0 = CFG.gy_top - CAL.bh
-    say("area: none saved, starting from the sx_scale/sy_scale/gy_top transform (full screen)")
+    -- v1.4.2 migration, once: the old gui-unit area + radar_fx/fy/size -> screen fractions, keeping the radar where it
+    -- is on screen now (through this resolution's transform)
+    local SX, SY, GT = CFG.sx_scale, CFG.sy_scale, CFG.gy_top
+    local x0, y0, x1, y1 = CFG.area_x0, CFG.area_y0, CFG.area_x1, CFG.area_y1
+    local had = x1 > x0 and y1 > y0
+    if not had then x0, x1, y1 = 0, CAL.bw, GT; y0 = GT - CAL.bh end
+    local aw, ah = x1 - x0, y1 - y0
+    local cgx, cgy = x0 + CFG.radar_fx * aw, y1 - CFG.radar_fy * ah
+    local rpx = CFG.radar_size * ah * SY / 2
+    CAL.cx, CAL.cy, CAL.d = cgx * SX / sw, (GT - cgy) * SY / sh, 2 * rpx / sh
+    say(string.format("ini: v1.4.2 migration once: %s area + radar_fx %.2f radar_fy %.2f radar_size %.2f -> radar_cx %.4f radar_cy %.4f radar_d %.4f (at %dx%d)",
+      had and "saved" or "default", CFG.radar_fx, CFG.radar_fy, CFG.radar_size, CAL.cx, CAL.cy, CAL.d, sw, sh))
+    CFG.v142_migrated = true
+    ini_save({ radar_cx = string.format("%.4f", CAL.cx), radar_cy = string.format("%.4f", CAL.cy), radar_d = string.format("%.4f", CAL.d),
+      v142_migrated = "true", __order = { "radar_cx", "radar_cy", "radar_d", "v142_migrated" } })
   end
-  CAL.on = CFG.calibrate; CAL.tab = "display"; CAL.move = false
+  sanity("load")
+  CAL.on = CFG.calibrate; CAL.tab = "display"
   if not CFG.v132_migrated then                     -- v1.3.2: radar_aspect 1.0 (the old default) -> 1.25, once
     local old = CFG.radar_aspect
     local f = io.open(CFG_PATH, "r"); local txt = f and f:read("*a") or ""; if f then f:close() end
@@ -1053,6 +1115,7 @@ end
 local function cal_log(why, sw, sh)
   local SX, SY, GT = CFG.sx_scale, CFG.sy_scale, CFG.gy_top
   local w, h = CAL.x1 - CAL.x0, CAL.y1 - CAL.y0
+  say(string.format("radar %s: centre %.4f, %.4f of the screen, diameter %.4f of its height (%dx%d)", why, CAL.cx, CAL.cy, CAL.d, sw, sh))
   say(string.format("area %s: gui left %.1f right %.1f top %.1f bottom %.1f centre %.1f,%.1f width %.1f height %.1f scale %.3f",
     why, CAL.x0, CAL.x1, CAL.y1, CAL.y0, (CAL.x0 + CAL.x1) / 2, (CAL.y0 + CAL.y1) / 2, w, h, cal_scale()))
   say(string.format("area %s: screen px (transform %.4f/%.4f/%.1f, screen %dx%d, y from top) left %.0f right %.0f top %.0f bottom %.0f centre %.0f,%.0f width %.0f height %.0f",
@@ -1061,11 +1124,10 @@ local function cal_log(why, sw, sh)
 end
 local function cal_save(why, sw, sh)
   cal_log(why, sw, sh)
-  local kv = { calibrate = tostring(CAL.on), toggle_key = KEYNAMES.toggle[1], area_x0 = string.format("%.2f", CAL.x0), area_y0 = string.format("%.2f", CAL.y0),
-               area_x1 = string.format("%.2f", CAL.x1), area_y1 = string.format("%.2f", CAL.y1),
-               area_scale = string.format("%.4f", cal_scale()),
+  local kv = { calibrate = tostring(CAL.on), toggle_key = KEYNAMES.toggle[1], radar_cx = string.format("%.4f", CAL.cx), radar_cy = string.format("%.4f", CAL.cy),
+               radar_d = string.format("%.4f", CAL.d), panel_fx = string.format("%.2f", CFG.panel_fx), panel_fy = string.format("%.2f", CFG.panel_fy),
                sensitivity = string.format("%.2f", CFG.sensitivity), repeat_rate = string.format("%.2f", CFG.repeat_rate), dot_size = CFG.dot_size,
-               __order = { "calibrate", "toggle_key", "area_x0", "area_y0", "area_x1", "area_y1", "area_scale", "sensitivity", "repeat_rate", "dot_size" } }
+               __order = { "calibrate", "toggle_key", "radar_cx", "radar_cy", "radar_d", "panel_fx", "panel_fy", "sensitivity", "repeat_rate", "dot_size" } }
   say("settings " .. why .. ": dot_size " .. CFG.dot_size)
   say(string.format("settings %s: sensitivity %.2f (range %.0f m, gain x%.2f), repeat_rate %.2f (re-acquire %.2f s, hold %.2f s, fade %.2f s)",
     why, CFG.sensitivity, clamp(CFG.range * CFG.sensitivity, 10, 120), CFG.sensitivity, CFG.repeat_rate,
@@ -1077,7 +1139,7 @@ end
 -- 1 scale (cyan), 2 sensitivity (orange), 3 repeat_rate (magenta): yellow tick at 1.0; 4 dot_size (red): 3 snap positions, tick at medium.
 local DOT_IDX_, DOT_NAMES_ = { small = 1, medium = 2, large = 3 }, { "small", "medium", "large" }
 local SL = {
-  { name = "scale", min = SMIN, max = SMAX, rgb = { 0, 200, 255 }, get = function() return cal_scale() end, set = function(v) set_scale(v) end },
+  { name = "scale", min = SMIN, max = SMAX, tick = D_DEF, rgb = { 0, 200, 255 }, get = function() return cal_scale() end, set = function(v) set_scale(v) end },
   { name = "sensitivity", min = 0.25, max = 3, rgb = { 255, 140, 0 }, get = function() return CFG.sensitivity end,
     set = function(v) CFG.sensitivity = clamp(v, 0.25, 3); CAL.dirty = true end },
   { name = "repeat_rate", min = 0.25, max = 3, rgb = { 220, 0, 255 }, get = function() return CFG.repeat_rate end,
@@ -1106,8 +1168,10 @@ end
 -- v1.4.0 tabs, fixed at the panel position: 1 Display (the radar: drag, wheel, arrows), 2 Settings (the sliders; the
 -- radar shows as a preview and does not move). Buttons 200 x 48 screen px, 12 px apart.
 local TABS = { { id = "display", label = "tab_display" }, { id = "settings", label = "tab_settings" } }
--- v1.4.1: button 3 is Move (Display tab only): while it is on, a left-drag moves the radar and the wheel/arrows resize
--- and nudge it; off, clicks on the radar do nothing. F7 opening, a tab switch or a second click turns it off (saved).
+-- v1.4.2: button 3 is Reset (both tabs): one click arms it (lit 3 s), a second click within 3 s confirms. On Display it
+-- puts the radar back (centred, 75% down, default size); on Settings it restores the slider defaults. Saved at once.
+-- Moving (Display tab): drag the grab handle on the radar's top edge; drag a corner handle to resize; the wheel over
+-- the radar resizes. Clicks elsewhere do nothing.
 local function tab_rect(i)
   local vw, vtop = CAL.bw, CFG.gy_top
   local w, h = 200 / CFG.sx_scale, 48 / CFG.sy_scale
@@ -1151,25 +1215,41 @@ local function panel_place(why)
   CAL.pfx, CAL.pfy, CAL.lpfx, CAL.lpfy = nfx, nfy, nfx, nfy
 end
 _G.SIXTH_SENSE_TAB = function(i) if i then return tab_rect(i) end return CAL.tab end   -- (read by the stub test)
-_G.SIXTH_SENSE_MOVE = function() return CAL.move == true end
+-- the grab handle: 44 x 44 screen px, centred on the radar's top edge, just inside it
+local function grab_rect()
+  local w, h = 44 / CFG.sx_scale, 44 / CFG.sy_scale
+  return (CAL.x0 + CAL.x1) / 2 - w / 2, CAL.y1 - h, w, h
+end
+_G.SIXTH_SENSE_GRAB = grab_rect
 _G.SIXTH_SENSE_PANEL = function() return CAL.pfx, CAL.pfy, panel_box() end
-local function move_off(sw, sh, why)
-  if not CAL.move then return end
-  CAL.move = false; CAL.drag = nil
-  cal_save("move off (" .. why .. ")", sw, sh)
-  panel_place("move off")
+_G.SIXTH_SENSE_RESET = function() return CAL.armed ~= nil and S.t < CAL.armed end
+local function reset_click(sw, sh)
+  if CAL.armed and S.t < CAL.armed then
+    CAL.armed = nil
+    if CAL.tab == "settings" then
+      CFG.sensitivity, CFG.repeat_rate, CFG.dot_size = 1.0, 1.0, "medium"; set_scale(D_DEF)
+      say("reset (Settings, confirmed): size, sensitivity, repeat_rate and dot_size back to their defaults")
+    else reset_pos("Display, confirmed") end
+    cal_save("reset", sw, sh); panel_place("reset")
+  else
+    CAL.armed = S.t + 3
+    say("reset: armed for 3 s (" .. CAL.tab .. "), click Reset again to confirm")
+  end
 end
 -- one frame of calibration input (mx, my: the cursor in gui units)
 local function cal_input(sw, sh, gx, gy)
   local sh_ = kdown("shift")
   local step = (sh_ and 20 or 2)
   local disp = CAL.tab ~= "settings"
-  if disp and CAL.move then
+  if CAL.armed and S.t >= CAL.armed then CAL.armed = nil end
+  if disp then
   if krep("left") then move_by(-step / CFG.sx_scale, 0) end
   if krep("right") then move_by(step / CFG.sx_scale, 0) end
   if krep("up") then move_by(0, step / CFG.sy_scale) end
   if krep("down") then move_by(0, -step / CFG.sy_scale) end
-  if IN.wheel and IN.wheel ~= 0 then set_scale(cal_scale() * (1 + 0.02 * clamp(IN.wheel, -10, 10))) end
+  if IN.wheel and IN.wheel ~= 0 and gx and gx >= CAL.x0 and gx <= CAL.x1 and gy >= CAL.y0 and gy <= CAL.y1 then
+    set_scale(cal_scale() * (1 + 0.02 * clamp(IN.wheel, -10, 10)))                          -- the wheel over the radar
+  end
   end
   if not gx then return end
   if IN.lmb and not CAL.was_lmb then           -- the button went down: what is under the cursor?
@@ -1177,24 +1257,29 @@ local function cal_input(sw, sh, gx, gy)
     for i = 1, #TABS do
       local x, y, w, h = tab_rect(i)
       if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
-        if CAL.tab ~= TABS[i].id then move_off(sw, sh, "tab"); CAL.tab = TABS[i].id; say("calibration tab: " .. CAL.tab) end
+        if CAL.tab ~= TABS[i].id then CAL.armed = nil; CAL.tab = TABS[i].id; say("calibration tab: " .. CAL.tab) end
         CAL.drag = "tab"; break
       end
     end
-    if not CAL.drag and disp then
+    if not CAL.drag then
       local x, y, w, h = tab_rect(3)
-      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
-        CAL.drag = "tab"
-        if CAL.move then move_off(sw, sh, "button") else CAL.move = true; say("move: on (drag the radar, wheel resizes)") end
-      end
+      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; reset_click(sw, sh) end
     end
     for i = 1, (CAL.drag or disp) and 0 or #SL do
       local tx, ty, tw, th = slider_rect(i)
       if gx >= tx - 15 and gx <= tx + tw + 15 and gy >= ty - 12 and gy <= ty + th + 12 then CAL.drag = i; break end
     end
-    if not CAL.drag and disp and CAL.move and gx >= CAL.x0 and gx <= CAL.x1 and gy >= CAL.y0 and gy <= CAL.y1 then CAL.drag = "move"; CAL.gx, CAL.gy = gx, gy end
+    if not CAL.drag and disp then
+      local x, y, w, h = grab_rect()
+      local hw, hh = 40 / CFG.sx_scale, 40 / CFG.sy_scale
+      local nearx = gx <= CAL.x0 + hw or gx >= CAL.x1 - hw
+      local neary = gy <= CAL.y0 + hh or gy >= CAL.y1 - hh
+      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "move"; CAL.gx, CAL.gy = gx, gy
+      elseif gx >= CAL.x0 and gx <= CAL.x1 and gy >= CAL.y0 and gy <= CAL.y1 and nearx and neary then CAL.drag = "resize" end
+    end
   elseif not IN.lmb then
-    if CAL.drag == "move" then panel_place("radar dropped") end
+    if CAL.drag == "move" or CAL.drag == "resize" then panel_place("radar dropped"); cal_save("dropped", sw, sh)
+    elseif CAL.drag == 1 then panel_place("size slider released") end
     CAL.drag = nil
   end
   CAL.was_lmb = IN.lmb
@@ -1205,6 +1290,11 @@ local function cal_input(sw, sh, gx, gy)
     if math.abs(v - d.get()) > 1e-4 then d.set(v) end
   elseif CAL.drag == "move" then
     if gx ~= CAL.gx or gy ~= CAL.gy then move_by(gx - CAL.gx, gy - CAL.gy); CAL.gx, CAL.gy = gx, gy end
+  elseif CAL.drag == "resize" then                      -- the corner follows the cursor (about the centre)
+    local cxg, cyg = (CAL.x0 + CAL.x1) / 2, (CAL.y0 + CAL.y1) / 2
+    local rpx = math.max(math.abs(gx - cxg) * CFG.sx_scale / CFG.radar_aspect, math.abs(gy - cyg) * CFG.sy_scale)
+    local d = 2 * rpx / CAL.sh
+    if math.abs(d - CAL.d) > 1e-6 then set_scale(d) end
   end
 end
 -- ---------------------------------------------------------------- the radar (v1.3)
@@ -1283,9 +1373,9 @@ local function project(x, y, ox, oy, R)
 end
 local function draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
   local I = RAD.info
-  local rpx = CFG.radar_size * ah * SY / 2          -- radius in screen px (radar_size = the diameter's share of the area height)
+  local rpx = ah * SY / 2                           -- v1.4.2: the box is the radar's own (diameter = box height)
   local rx, ry = rpx / SX * CFG.radar_aspect, rpx / SY        -- (round on screen; radar_aspect trims the width)
-  local cx, cy = ax0 + CFG.radar_fx * aw, (ay0 + ah) - CFG.radar_fy * ah
+  local cx, cy = ax0 + aw / 2, ay0 + ah / 2
   local R = clamp(CFG.range * CFG.sensitivity, 10, 120)
   local before = S.draw_ok + S.draw_fail
   local style = "dots"
@@ -1346,7 +1436,7 @@ end
 -- in v0.3 the performance HUD font drew white blocks and the game crashed in the ship transition; working mods on this
 -- game use a retained text GUI with the game's runtime font and its own material, which is a lot to get right blind.
 local LABEL_TEX = {
-  tab_move = { '698bb55ee378f828', 100, 48 },
+  tab_reset = { 'a44a41940a973e9e', 104, 48 },
   tab_display = { '9b2fd888f42b0c0e', 132, 48 },
   tab_settings = { 'ad6b66f6687bfb85', 144, 48 },
   size = { '7c2ccf6a4c4cb0d5', 76, 48 },
@@ -1354,7 +1444,7 @@ local LABEL_TEX = {
   repeat_rate = { 'ae02fd6005683294', 196, 48 },
   dot_size = { '8024c7d02d7bd868', 136, 48 },
 }
-local LABEL_WORD = { tab_move = "MOVE", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE" }
+local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE" }
 local GLYPH = {
   ["0"] = "01110100011001110101110011000101110", ["1"] = "00100011000010000100001000010001110",
   ["2"] = "01110100010000100010001000100011111", ["3"] = "11110000010000101110000010000111110",
@@ -1434,6 +1524,7 @@ local function draw()
       math.floor(clamp(r, 0, 255)), math.floor(clamp(g, 0, 255)), math.floor(clamp(b, 0, 255))), LAYER_NOW)
   end
   -- the screen transform (v0.9): (fx, fy) of the visible screen, fy from the top, w and h in screen px -> gui units.
+  if not CAL.bw then cal_init(sw, sh) end
   local SX, SY, GT = CFG.sx_scale, CFG.sy_scale, CFG.gy_top
   if not S.xf_logged then
     S.xf_logged = true
@@ -1442,13 +1533,34 @@ local function draw()
   end
   if not CAL.bw then cal_init(sw, sh) end
   if not IN.probed then probe() end
+  -- v1.4.2: a resolution change (checked once a second): new transform, the radar kept at its screen fractions,
+  -- clamped back in (reset if invalid), the panel re-placed
+  if S.t >= (CAL.res_next or 0) then
+    CAL.res_next = S.t + 1
+    if sw ~= CAL.sw or sh ~= CAL.sh then
+      local ow, oh = CAL.sw, CAL.sh
+      apply_xf(sw, sh, string.format("resolution change from %dx%d", ow, oh))
+      SX, SY = CFG.sx_scale, CFG.sy_scale
+      sanity("resolution change"); panel_place("resolution change"); cal_save("resolution change", sw, sh)
+    end
+  end
   -- toggle_key (f7): calibration on/off (saved both ways)
   if kpressed("toggle") then
     CAL.on = not CAL.on
-    CAL.move = false                                -- (F7 open: Move off; close: saved below)
+    CAL.armed = nil
     if not CAL.on then hold_give(); CAL.drag = nil else CAL.tab = "display"; panel_place("opened") end   -- (F7 opens on Display)
     cal_save((CAL.on and "calibration on (" or "calibration off (") .. KEYNAMES.toggle[1] .. ")", sw, sh)
   end
+  -- panic recovery: F7 held 3 s resets the layout (radar and panel), calibration left on
+  if kdown("toggle") then
+    CAL.f7_t = CAL.f7_t or S.t
+    if not CAL.f7_done and S.t - CAL.f7_t >= 3 then
+      CAL.f7_done = true
+      CFG.panel_fx, CFG.panel_fy = 0.03, 0.08
+      reset_pos("F7 held 3 s"); CAL.on, CAL.tab, CAL.drag = true, "display", nil
+      panel_place("F7 held 3 s"); cal_save("layout reset (F7 held 3 s)", sw, sh)
+    end
+  else CAL.f7_t, CAL.f7_done = nil, nil end
   local function gbox(x, y, w, h, a, r, g, b) box(x, y, w, h, a, r, g, b) end
   local gx, gy
   if CAL.on then
@@ -1459,7 +1571,7 @@ local function draw()
   elseif IN.hold then hold_give() end
   local ax0, ay0, ax1, ay1 = CAL.x0, CAL.y0, CAL.x1, CAL.y1
   local aw, ah = ax1 - ax0, ay1 - ay0
-  local sc = aw / CAL.bw
+  local sc = CAL.d / D_DEF                          -- (dot and marker sizes follow the radar's size; 1 at the default)
   if CAL.on and not CAL.placed then CAL.placed = true; panel_place("start") end
   if CAL.on and CAL.tab ~= "settings" then
     local t1, t2 = 3 / SX, 3 / SY
@@ -1471,8 +1583,14 @@ local function draw()
     gbox(ax1 - hw, ay1 - hh, hw, hh, 240, 0, 255, 0)                         -- top-right: green
     gbox(ax0, ay0, hw, hh, 240, 0, 80, 255)                                  -- bottom-left: blue
     gbox(ax1 - hw, ay0, hw, hh, 240, 255, 255, 0)                            -- bottom-right: yellow
-    local cx, cy = ax0 + aw / 2, ay0 + ah / 2                                -- centre cross, 80 x 6 px
-    gbox(cx - 40 / SX, cy - 3 / SY, 80 / SX, 6 / SY, 240, 255, 255, 255); gbox(cx - 3 / SX, cy - 40 / SY, 6 / SX, 80 / SY, 240, 255, 255, 255)
+    local hx, hy, hw2, hh2 = grab_rect()                                    -- the grab handle: a 4-way arrow
+    local mx, my = hx + hw2 / 2, hy + hh2 / 2
+    gbox(hx, hy, hw2, hh2, 245, 20, 20, 30)
+    gbox(mx - 16 / SX, my - 2 / SY, 32 / SX, 4 / SY, 255, 255, 255, 255); gbox(mx - 2 / SX, my - 16 / SY, 4 / SX, 32 / SY, 255, 255, 255, 255)
+    for s = -1, 1, 2 do                                                      -- arrow heads
+      gbox(mx + s * 14 / SX - 3 / SX, my - 6 / SY, 6 / SX, 12 / SY, 255, 255, 255, 255)
+      gbox(mx - 6 / SX, my + s * 14 / SY - 3 / SY, 12 / SX, 6 / SY, 255, 255, 255, 255)
+    end
   end
   -- the radar: replaces the bars (v1.3)
   draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
@@ -1490,7 +1608,7 @@ local function draw()
       draw_label(gbox, label, x + w / 2 + (LABEL_TEX[label][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
     end
     for i = 1, #TABS do button(i, TABS[i].label, CAL.tab == TABS[i].id) end   -- the tab buttons; the active one lit
-    if CAL.tab ~= "settings" then button(3, "tab_move", CAL.move) end         -- Move (Display only), lit while on
+    button(3, "tab_reset", CAL.armed ~= nil and S.t < CAL.armed)              -- Reset (both tabs), lit while armed
     if CAL.tab == "settings" then
     for i = 1, #SL do                                                        -- the sliders: track, fill, knob, tick at 1.0
       local d = SL[i]

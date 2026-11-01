@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.1 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.4.2 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -333,3 +333,16 @@ where the camera looks.
   - xlarge is the Harvester and the Factory/War Striders and Vox Engine.
   - The hashlist has no Fleshmob (or other Illuminate unit) paths, so no other ids were found.
   - Enemy structures stay medium diamonds (11 px).
+
+## v1.4.2 changes
+- **Placement that survives a resolution change:** the radar is now stored as `radar_cx` and `radar_cy` (its centre as fractions of the visible screen, cy from the top) and `radar_d` (its diameter as a fraction of the screen height). These are converted through the current transform every frame.
+  - Your old `area_*`, `radar_fx`, `radar_fy` and `radar_size` were converted once (`v142_migrated`) at the resolution in use when it first loads, so the radar stays where it was on screen. The old keys are left in the ini but no longer used.
+  - The Size slider now sets the diameter (0.08–1.0, tick at the default 0.35).
+- **Transform:** `sx_scale` and `sy_scale` (1.2 and 0.9333, measured at 3840×1080) are taken as measured at `transform_ref_h` (1080) and scaled with the screen height. In other words the gui is assumed to be 1080-tall-normalised: sx = 1.2·H/1080, sy = 0.9333·H/1080, with gy_top fixed at 1080, so the visible gui width follows the aspect ratio. `transform_scale=fixed` brings back the old fixed numbers.
+  - This model is an assumption; only 3840×1080 has been measured. Every load and resolution change logs a `transform (...)` line (screen, model, sx/sy, visible gui and drawable bottom) so other resolutions can be checked.
+  - Back_buffer_size is checked once a second. On a change the transform is redone, the radar keeps its fractions, is clamped back in (reset if still invalid), the panel is re-placed and everything is saved.
+- **Recovery:**
+  - On load and on any resolution change, a radar outside the drawable screen is clamped back in, and an invalid one is reset.
+  - The **Reset** button sits on both tabs. One click arms it (lit for 3 s); a second click within 3 s confirms. On Display it puts the radar back centred, 75% down the drawable area, at the default size. On Settings it restores the slider defaults (size, sensitivity, repeat rate, dot size). It saves at once and logs.
+  - **Holding F7 for 3 s** resets the whole layout (radar and panel position) and leaves calibration on.
+- **Moving without the Move toggle** (which is gone): on the Display tab, drag the 4-way grab handle on the radar's top edge to move it, drag a corner handle to resize it about its centre, or use the wheel over the radar to resize. Clicks anywhere else on the radar do nothing, and the arrow keys still nudge. The panel stays on top and is re-placed when the radar is dropped or the Size slider is released.
