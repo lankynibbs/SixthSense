@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.5.2 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.5.3 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.5.2"
+local MOD, VERSION = "sixth_sense", "1.5.3"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -146,7 +146,7 @@ dot_size=medium
 v144_migrated=true
 ; radar_color (v1.5.1): the radar display's colour (disc, rings, cross hairs; v1.5.2: not the enemy markers): green (default), white, yellow,
 ; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
-; Enemy dots stay red and enemy structures orange diamonds in every colour.
+; Enemy dots and enemy structures (diamonds) stay red in every colour.
 radar_color=green
 ; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
 ; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
@@ -162,7 +162,7 @@ ignore_ids=
 ; still_hide: seconds an enemy may stand fully still (same spot, same animation state) before its dot is hidden
 ; (bodies; it shows again when it moves). 0 = off.
 still_hide=1.0
-; static_ids: extra enemy structure ids (16 hex, comma separated) shown as orange diamonds, on top of the built-in
+; static_ids: extra enemy structure ids (16 hex, comma separated) shown as red diamonds, on top of the built-in
 ; list (bot cannon, AA and mortar turrets, the bunker turret). static_log: true logs unknown non-animated kinds near you
 ; once each, with their distance ("static?: ..."), so turrets can be mapped.
 static_ids=
@@ -211,9 +211,9 @@ local LAYOUTS_COMMENT = [[; radar_layouts (v1.4.6): the radar's place saved per 
 ; to a resolution restores its layout; one with none saved starts centred in the drawable area at the default size. Reset (two clicks, or F7 held 3 s) clears only the current resolution's entry. Written by calibration.]]
 local COLOR_COMMENT = [[; radar_color (v1.5.1): the radar display's colour (disc, rings, cross hairs; v1.5.2: not the enemy markers): green (default), white, yellow,
 ; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
-; Enemy dots stay red and enemy structures orange diamonds in every colour.]]
+; Enemy dots and enemy structures (diamonds) stay red in every colour.]]
 -- v1.5.1 radar colours: ring = disc tint, rings and cross hairs. v1.5.2: the radar display only; enemy dots stay red
--- and enemy structures orange in every colour
+-- and enemy structures (diamonds) red too (v1.5.3: no orange) in every colour
 local COLOR_NAMES = { "green", "white", "yellow", "red", "light_blue" }
 local COLOR_IDX = { green = 1, white = 2, yellow = 3, red = 4, light_blue = 5 }
 local PALETTE = {
@@ -651,7 +651,7 @@ end
 -- ---------------------------------------------------------------- v1.4.0: enemy structures (turrets, emplacements)
 -- They have no animation state machine (or one that never moves) and stand still, so the candidate and still-hide
 -- rules drop them. A listed static kind is tracked from the World.units walk (its position is read even with no state
--- machine) and drawn as an orange-red diamond, medium size, never hidden for standing still; it goes when it is no
+-- machine) and drawn as a red diamond, medium size, never hidden for standing still; it goes when it is no
 -- longer alive, its death state shows (asked only with a state machine), its first mesh is hidden (Treasure Radar's
 -- destroyed-structure test), or the walk stops finding it (10 s).
 -- Ids are hashes of the unit paths (hashlist + BingusSharedLoader archive.resource_hash); none was in the v1.3.2 ix
@@ -1659,11 +1659,11 @@ local function draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
       local a = beyond and alpha * 0.4 or alpha
       local px, py = cx + fx * rx, cy + fy * ry
       if static then
-        -- v1.4.0 enemy structure: an orange-red diamond (three stacked bars: narrow, wide, narrow)
+        -- v1.4.0 enemy structure: a diamond (v1.5.3: the enemy dots' red, was orange) (three stacked bars: narrow, wide, narrow)
         local w, h = s / SX, s / SY
-        gbox(px - w * 0.2, py + h * 0.2, w * 0.4, h * 0.3, a, 255, 110, 20)
-        gbox(px - w * 0.5, py - h * 0.2, w, h * 0.4, a, 255, 110, 20)
-        gbox(px - w * 0.2, py - h * 0.5, w * 0.4, h * 0.3, a, 255, 110, 20)
+        gbox(px - w * 0.2, py + h * 0.2, w * 0.4, h * 0.3, a, 255, 40, 40)
+        gbox(px - w * 0.5, py - h * 0.2, w, h * 0.4, a, 255, 40, 40)
+        gbox(px - w * 0.2, py - h * 0.5, w * 0.4, h * 0.3, a, 255, 40, 40)
       else
         local w, h = s / SX, s / SY
         gbox(px - w / 2, py - h / 2, w, h, a, 255, 40, 40)   -- (v1.5.2: always red)

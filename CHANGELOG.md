@@ -6,6 +6,10 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-11-02
+### Changed
+- Enemy structure (turret) diamonds drawn in the enemy dots' red (255,40,40) instead of orange, at Darryl's request; the diamond shape stays.
+
 ## [1.5.2] - 2026-11-02
 ### Changed
 - `radar_color` tints only the radar display (disc, rings, cross hairs). Enemy dots stay red and enemy structures orange in every colour; v1.5.1's per-colour dot shades removed. Darryl confirmed the colour change works in game.

@@ -80,3 +80,6 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 
 ## Radar colour on the display only (v1.5.2, 2026-11-02)
 - Darryl confirmed the v1.5.1 colour change works in game (the Gui.bitmap tint recolours the disc), but the colour was meant for the radar display only, not the enemy markers. v1.5.2 drops the per-colour dot shades: enemy dots are always red, enemy structures always orange; `radar_color` tints the disc, rings and cross hairs.
+
+## Red structure diamonds (v1.5.3, 2026-11-02)
+- Darryl had not asked for orange turret diamonds (orange dated from v1.4.0). v1.5.3 draws them in the enemy dots' red (255,40,40), keeping the diamond shape so structures stay distinguishable from units.

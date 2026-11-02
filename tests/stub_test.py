@@ -534,7 +534,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.5.2 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.5.3 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -563,7 +563,8 @@ Unit.world_position = function(u) if u == rt then error("CRASH") end
   return stingray.Vector3(p[1] + 0.1 * math.sin(FR * 0.7), p[2], p[3]) end
 SQ = 0
 local oldrect = Gui.rect
-Gui.rect = function(g, p, sz, c) if c[2] == 255 and c[3] == 110 and c[4] == 20 then SQ = SQ + 1 end return oldrect(g, p, sz, c) end
+Gui.rect = function(g, p, sz, c) if c[2] == 255 and c[3] == 40 and c[4] == 40 and sz[1] / sz[2] > 0.9 then SQ = SQ + 1 end   -- (v1.5.3: red; diamond bars are not the dots' square shape)
+if c[2] == 255 and c[3] == 110 and c[4] == 20 then ORANGE = (ORANGE or 0) + 1 end return oldrect(g, p, sz, c) end
 """
 r42 = radar_rt(EXTRA40); u42 = r42.eval('update'); g42 = r42.globals()
 def run42(sec):
@@ -574,7 +575,7 @@ run42(3.0)
 def e42(n): return g42.HUD_S.T[g42[n]]
 check(e42('TUR') is not None and e42('TUR').kind == 'static' and e42('TUR').show and e42('TUR').size == 'medium', 'Cannon Turret (no state machine, never moves) tracked as static, shown, medium')
 check(e42('USER') is not None and e42('USER').show, 'ini static_ids adds a structure')
-check(g42.SQ >= 6, 'structures drawn as orange-red diamonds (%d rects)' % g42.SQ)
+check(g42.SQ >= 6 and not g42.ORANGE, 'structures drawn as red (255,40,40) diamonds, no orange (%d rects)' % g42.SQ)
 check(e42('ALT') is None, 'our gatling sentry (ef85d6cf58e31d70) never shown')
 check(e42('LATE') is None, 'a listed turret appearing near me after landing is taken as ours')
 check(e42('TT') is None, 'a turret on a tracked Tank (within 6 m) is not a second dot')
@@ -768,12 +769,12 @@ check(not re.search(r' (MARK|PICK)\b', lgp) and 'MARKED' not in lgp and 'picked_
 PAL = {'green': (90, 255, 140), 'white': (235, 235, 235), 'yellow': (255, 225, 60), 'red': (255, 70, 60), 'light_blue': (110, 200, 255)}
 ORDER = ['green', 'white', 'yellow', 'red', 'light_blue']
 FINDCFG = 'local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end\nHUD_CFG = find(find(update, "step"), "CFG")'
-COLX = '\nCOLS = {}\nlocal gr = Gui.rect\nGui.rect = function(g, p, sz, c) COLS[c[2] .. "," .. c[3] .. "," .. c[4]] = true; return gr(g, p, sz, c) end\nHUD_CFG.radar_style = "dots"\nTURX = {}\nlocal wu = World.units\nWorld.units = function(w) local t = wu(w); t[#t + 1] = TURX; return t end\nlocal rn = Unit.resource_name\nUnit.resource_name = function(u) if u == TURX then return setmetatable({}, {__tostring = function() return "#ID[2cf3488c4845f8bd]" end}) end return rn(u) end\nlocal wp = Unit.world_position\nUnit.world_position = function(u) if u == TURX then return stingray.Vector3(-15, 5, 0) end return wp(u) end\nlocal am = Unit.has_animation_state_machine\nUnit.has_animation_state_machine = function(u) if u == TURX then return false end return am(u) end'
+COLX = '\nCOLS = {}\nlocal gr = Gui.rect\nGui.rect = function(g, p, sz, c) COLS[c[2] .. "," .. c[3] .. "," .. c[4]] = true; if c[2] == 255 and c[3] == 40 and c[4] == 40 and sz[1] / sz[2] > 0.9 then TURRED = (TURRED or 0) + 1 end return gr(g, p, sz, c) end\nHUD_CFG.radar_style = "dots"\nTURX = {}\nlocal wu = World.units\nWorld.units = function(w) local t = wu(w); t[#t + 1] = TURX; return t end\nlocal rn = Unit.resource_name\nUnit.resource_name = function(u) if u == TURX then return setmetatable({}, {__tostring = function() return "#ID[2cf3488c4845f8bd]" end}) end return rn(u) end\nlocal wp = Unit.world_position\nUnit.world_position = function(u) if u == TURX then return stingray.Vector3(-15, 5, 0) end return wp(u) end\nlocal am = Unit.has_animation_state_machine\nUnit.has_animation_state_machine = function(u) if u == TURX then return false end return am(u) end'
 open(INI, 'w').write(BASE146.replace('calibrate=false', 'calibrate=true') + 'v146_migrated=true\nradar_layouts=\n')
 rc = radar_rt(COLX); uc = rc.eval('update'); gc = rc.globals(); CC = gc.HUD_CFG
 def runc(sec):
     for _ in range(max(1, int(sec / 0.016))): uc(0.016)
-def cols(): rc.execute('COLS = {}'); runc(0.1); return set(k for k, v in gc.COLS.items())
+def cols(): rc.execute('COLS = {}; TURRED = 0'); runc(0.1); return set(k for k, v in gc.COLS.items())
 def inival(k): return dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get(k)
 runc(3.5)
 check(CC.radar_color == 'green', 'default radar_color is green')
@@ -788,7 +789,7 @@ for name in ['white', 'yellow', 'red', 'light_blue', 'green']:
     check(CC.radar_color == name and inival('radar_color') == name and '; radar_color (v1.5.1)' in open(INI).read(), 'Radar color slider -> %s, saved with its comment (ini %s)' % (name, inival('radar_color')))
     others = [PAL[o] for o in ORDER if o != name]
     check('%d,%d,%d' % ring_ in cs and '255,40,40' in cs and not any('%d,%d,%d' % o in cs for o in others), '%s: rings / cross hairs %s only; enemy dots still red 255,40,40' % (name, ring_))
-    check('255,110,20' in cs, '%s: turret diamonds still orange 255,110,20' % name)
+    check('255,110,20' not in cs and gc.TURRED >= 3, '%s: turret diamonds red 255,40,40 (%d bars), no orange' % (name, gc.TURRED))
 CC.radar_color = 'yellow'
 for k in range(2, 16): rc.execute('PRESSED[%d] = true' % k); runc(0.02); rc.execute('PRESSED = {}'); runc(0.02)
 check(CC.radar_color == 'yellow', 'radar_color is mouse only: no key changes it')
