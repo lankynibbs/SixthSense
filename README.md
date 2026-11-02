@@ -2,7 +2,7 @@
 
 **A 360° enemy radar HUD for Helldivers 2, running under HellForge with Bingus Shared Loader.**
 
-Version **1.5.5** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
+Version **1.5.6** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
 
 ![Sixth Sense radar preview](docs/images/radar_preview_green.png)
 
@@ -11,7 +11,9 @@ turns with your view: up on the radar is where you are looking. Red squares are 
 structures (turrets and the like), and the white marker in the middle is you. It only reads the game and draws on
 the screen; it changes nothing in the game.
 
-> This repository is private for now and is being prepared for sharing. Share the release zip, not the repo.
+> **Homepage / source:** https://github.com/lankynibbs/SixthSense (branch `develop`)  
+> Controls guide: https://github.com/lankynibbs/SixthSense/blob/develop/CONTROLS.md  
+> Bug reports and ideas: https://github.com/lankynibbs/SixthSense/issues
 
 ## Requirements
 - **HellForge** (the offline Helldivers 2 launcher, game build 25480438).
@@ -19,7 +21,8 @@ the screen; it changes nothing in the game.
   not ship it.
 
 ## Install
-1. Download **Bingus Shared Loader** (`Bingus-Shared-Loader-v20.zip`) and **`SixthSense.zip`**.
+1. Download **Bingus Shared Loader** (`Bingus-Shared-Loader-v20.zip`) and **`SixthSense.zip`** (from the mod page, or
+   build it from the source above).
 2. Open the HellForge launcher > **Mods** > **Add mods...** and pick both zips.
 3. Switch **both** on (new mods start switched off; they show in the cosmetic group with a **LUA** tag).
 4. Launch the game from HellForge. The radar appears in game; press **F7** to set it up.
@@ -61,10 +64,11 @@ Settings from the older **Rear Heat HUD** (`rear_heat_hud.ini`) are copied over 
 - Enemy recognition uses a built-in list of enemy ids; an enemy type not on it may not show.
 
 ## For developers
+- Browse or clone: https://github.com/lankynibbs/SixthSense (`git clone https://github.com/lankynibbs/SixthSense.git`, branch `develop`).
 - Source: `src/sixth_sense.lua` (plus `src/enemy_tiers.lua.inc`). Build: `python3 tools/build.py` writes
   `SixthSense.zip` (needs the sibling `BingusSharedLoader` and `Treasure-Radar` checkouts). Offline test:
   `python3 tests/stub_test.py` (needs `lupa`).
-- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.5.5", the GUID above) and
+- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.5.6", the GUID above) and
   `Addon/9ba626afa44a3aa3.patch_0` with its `.gpu_resources` and `.stream`: the Lua addon plus the textures from
   `assets/` (the radar disc, the F7 page's word labels and the Help pages). The Help pages (`assets/help_*.png`)
   and the text embedded in the Lua are made from README.md and CONTROLS.md by `tools/help_pages.py`, which

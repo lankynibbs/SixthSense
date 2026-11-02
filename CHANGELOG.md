@@ -6,6 +6,10 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.5.6] - 2026-11-02
+### Changed
+- The repo is public: README (homepage, browse / clone, CONTROLS.md, issues) and CONTROLS.md link https://github.com/lankynibbs/SixthSense; the "private repo" note is gone. In-game Help regenerated from them shows the URLs (web links keep their URL in the Help pages).
+
 ## [1.5.5] - 2026-11-02
 ### Added
 - **Help** button (fourth on the F7 page, both tabs): README.md and CONTROLS.md shown in game as pages, rendered to textures and embedded as text at build time (`tools/help_pages.py`, run by `tools/build.py`), so the zip needs nothing else. Mouse: wheel or left / right half turns pages; Help, a click outside, Reset or a tab closes it (no reset, settings untouched). Controller: R3 opens / closes, LB / RB or D-pad left / right pages, B closes Help.

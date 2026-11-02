@@ -17,8 +17,9 @@ BEGIN, END = '-- BEGIN HELP DOCS', '-- END HELP DOCS'
 
 def inline(t):
     t = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', t)
+    t = re.sub(r'\[([^\]]+)\]\((https?://[^)]*)\)', lambda m: m.group(1) if m.group(1) == m.group(2) else '%s (%s)' % (m.group(1), m.group(2)), t)   # (v1.5.6: web links keep their URL)
     t = re.sub(r'\[([^\]]+)\]\([^)]*\)', r'\1', t)
-    t = t.replace('**', '').replace('`', '').replace('<', '').replace('>', '')
+    t = t.replace('**', '').replace('`', '')
     return t.strip()
 
 def blocks(md):
@@ -37,7 +38,7 @@ def blocks(md):
         s2 = re.sub(r'^\s*>\s?', '', s)
         m = re.match(r'^(\s*)([-*]|\d+\.)\s+(.*)', s2)
         if m: out.append(('li', ('  ' * (len(m.group(1)) // 2)) + ('• ' if m.group(2) in '-*' else m.group(2) + ' ') + inline(m.group(3)))); continue
-        if out and out[-1][0] in ('p', 'li') and raw.startswith(' '):
+        if out and (out[-1][0] == 'p' or (out[-1][0] == 'li' and raw.startswith(' '))) and not raw.startswith('>'):   # (a paragraph's next line)
             out[-1] = (out[-1][0], out[-1][1] + ' ' + inline(s2)); continue
         out.append(('p', inline(s2)))
     return out
