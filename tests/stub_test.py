@@ -79,7 +79,8 @@ def check(ok, what): print(('PASS ' if ok else 'FAIL ') + what); (None if ok els
 frames(200)                              # settle + first draws
 # v1.4.2: the old gui area + radar_fx 0.5 / radar_fy 0.78 / radar_size 0.35 migrated once to screen fractions
 c = G.SIXTH_SENSE_CAL
-ecx = (300 + 0.5 * 1066.67) * SX / SW; ecy = (GT - (971.45 - 0.78 * 771.45)) * SY / SH; ed = 0.35 * 771.45 * SY / SH
+YB = min(1, GT * SY / SH)                # v1.4.6: fractions of the drawable area (the window cut at the gui's bottom)
+ecx = (300 + 0.5 * 1066.67) * SX / SW; ecy = (GT - (971.45 - 0.78 * 771.45)) * SY / SH / YB; ed = 0.35 * 771.45 * SY / SH / YB
 check(abs(c.cx - ecx) < 1e-4 and abs(c.cy - ecy) < 1e-4 and abs(c.d - ed) < 1e-4, 'migrated radar_cx %.4f radar_cy %.4f radar_d %.4f (want %.4f %.4f %.4f)' % (c.cx, c.cy, c.d, ecx, ecy, ed))
 ini = open(INI).read()
 check('v142_migrated=true' in ini and 'radar_cx=%.4f' % ecx in ini and 'area_x0=300' in ini, 'migration saved once; the old area keys left as they were')
@@ -99,7 +100,7 @@ check(fr() == f0, 'Display: a drag on the radar body and the wheel off the radar
 P0 = tuple(SLR(i) for i in (1, 4))
 gx_, gy_, gw_, gh_ = grab()
 mid = drag(gx_ + gw_ / 2, gy_ + gh_ / 2, 200, 100)
-check(abs(c.cx - (f0[0] + 200 / RW)) < 1e-3 and abs(c.cy - (f0[1] - 100 / RH)) < 1e-3 and c.d == f0[2], 'grab handle drag moved the radar by 200, 100 window px (%.4f, %.4f)' % (c.cx - f0[0], c.cy - f0[1]))
+check(abs(c.cx - (f0[0] + 200 / RW)) < 1e-3 and abs(c.cy - (f0[1] - 100 / (RH * YB))) < 1e-3 and c.d == f0[2], 'grab handle drag moved the radar by 200, 100 window px (%.4f, %.4f)' % (c.cx - f0[0], c.cy - f0[1]))
 check(mid == P0, 'mid-drag the slider panel stays put (re-placed only on drop)')
 check('ini: saved dropped' in open(LOGDIR + '/sixth_sense.log').read(), 'saved on drop')
 # the wheel over the radar resizes
@@ -139,7 +140,7 @@ gx_, gy_, gw_, gh_ = grab(); drag(gx_ + gw_ / 2, gy_ + gh_ / 2, -150, 80)
 f0 = fr(); click_tab(r, 3); frames(int(3.2 / 0.016)); click_tab(r, 3)
 check(fr() == f0 and RS(), 'Reset: a second click after 3 s only re-arms')
 click_tab(r, 3); yb = min(1, GT * SY / SH)
-check(abs(c.cx - 0.5) < 1e-6 and abs(c.cy - 0.75 * yb) < 1e-4 and abs(c.d - 0.35) < 1e-6 and 'radar_cx=0.5000' in open(INI).read(), 'Reset confirmed on Display: centred, 75%% down, default size, saved (%.3f, %.3f)' % (c.cx, c.cy))
+check(abs(c.cx - 0.5) < 1e-6 and abs(c.cy - 0.5) < 1e-4 and abs(c.d - 0.35) < 1e-6 and re.search(r'^radar_layouts=(.*)$', open(INI).read(), re.M) and ('%dx%d:' % (SW, SH)) not in re.search(r'^radar_layouts=(.*)$', open(INI).read(), re.M).group(1), 'Reset confirmed on Display: centred in the drawable area, default size, saved (%.3f, %.3f)' % (c.cx, c.cy))
 # drag far down and right: clamped inside the drawable screen
 gx_, gy_, gw_, gh_ = grab(); drag(gx_ + gw_ / 2, gy_ + gh_ / 2, 800, -800, 20)
 check(c.y0 >= -1e-6 and c.x1 <= c.bw + 1e-6, 'drag down-right: clamped (bottom gy %.2f, right %.1f of %.1f)' % (c.y0, c.x1, c.bw))
@@ -147,9 +148,10 @@ lg = open(LOGDIR + '/sixth_sense.log').read()
 check('drawable gui bounds' in lg and 'area clamped (move)' in lg, 'bounds and clamp logged')
 # resolution change: 2560x1440 -> 3840x1080: same screen fractions, new transform logged
 f0 = fr(); G.BBW, G.BBH = 3840, 1080; frames(70)
-check(abs(c.cx - f0[0]) < 1e-9 and abs(c.cy - f0[1]) < 0.01 and 'transform (resolution change from 2560x1440): screen 3840x1080' in open(LOGDIR + '/sixth_sense.log').read(), 'resolution change: the radar keeps its screen fractions; transform logged')
+check(abs(c.cx - 0.5) < 1e-9 and abs(c.cy - 0.5) < 1e-9 and 'transform (resolution change from 2560x1440): screen 3840x1080' in open(LOGDIR + '/sixth_sense.log').read() and 'viewport (resolution change from 2560x1440): screen 3840x1080' in open(LOGDIR + '/sixth_sense.log').read(), 'resolution change to unsaved 3840x1080: centred default; transform and viewport logged')
 check(abs(c.bw - 3840 / (1.2 * 1080 / 1440)) < 1e-6, 'height model: sx_scale scales with the height (visible gui %.1f wide)' % c.bw)
 G.BBW, G.BBH = None, None; frames(70)
+check(abs(c.cx - f0[0]) < 1e-9 and abs(c.cy - f0[1]) < 1e-9, 'back to 2560x1440: its saved layout restored')
 # F7 held 3 s: the whole layout reset
 gx_, gy_, gw_, gh_ = grab(); drag(gx_ + gw_ / 2, gy_ + gh_ / 2, -200, 50)
 r.execute('HELD[1] = true'); frames(int(3.2 / 0.016)); r.execute('HELD = {}'); frames(1)
@@ -532,7 +534,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.4.5 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.4.6 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -604,16 +606,16 @@ for h, want in (('67dc32dca4f02d33', 'large'), ('f22d027b37bef107', 'large'), ('
 check('CLASS_PX = { tiny = 12, medium = 24, large = 44, xlarge = 58 }  -- v1.4.4: dots start out about twice as big' in lua and 'DOT_MUL = { small = 0.75, medium = 1.0, large = 1.35 }' in lua, 'base sizes 12/24/44/58 px, x 0.75/1/1.35')
 
 # ---------------------------------------------------------------- v1.4.2: load-time recovery
-open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=1.40\nradar_cy=0.30\nradar_d=0.30\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nv146_migrated=true\nradar_layouts=2560x1440:1.4000,0.3000,0.3000\n')
 r60 = radar_rt(); u60 = r60.eval('update')
 for _ in range(220): u60(0.016)
 c60 = r60.globals().SIXTH_SENSE_CAL
 check(c60.x1 <= c60.bw + 1e-6 and c60.cx < 1 and 'area clamped (load)' in open(LOGDIR + '/sixth_sense.log').read(), 'load: an offscreen radar (radar_cx 1.4) is clamped back in (%.3f)' % c60.cx)
-open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=9\nradar_cy=0.30\nradar_d=0.30\n')
+open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nv146_migrated=true\nradar_layouts=2560x1440:9,0.3000,0.3000\n')
 r61 = radar_rt(); u61 = r61.eval('update')
 for _ in range(220): u61(0.016)
 c61 = r61.globals().SIXTH_SENSE_CAL
-check(abs(c61.cx - 0.5) < 1e-9 and 'invalid position' in open(LOGDIR + '/sixth_sense.log').read(), 'load: an invalid position is reset')
+check(abs(c61.cx - 0.5) < 1e-9 and 'no saved layout for 2560x1440' in open(LOGDIR + '/sixth_sense.log').read(), 'load: an invalid saved layout is ignored (centred default)')
 # ---------------------------------------------------------------- v1.4.4: dot migration, visibility
 open(INI, 'w').write('transform_ref_h=1440\n' + 'calibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nradar_cx=0.5\nradar_cy=0.7\nradar_d=0.35\ndot_size=small\n')
 r70 = radar_rt(); u70 = r70.eval('update'); g70 = r70.globals()
@@ -660,6 +662,59 @@ PB = list(r11.eval('function() return {SIXTH_SENSE_PANEL()} end')().values())
 x, y, w, h = VR(2); tx, ty, tw, th = r11.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')(4)
 check(PB[3] <= y and PB[4] >= x + w and y + h < ty, 'buttons under the last slider, inside the panel backing')
 open(INI, 'w').write(open(INI).read().replace('visibility=hidden', 'visibility=shown'))   # (the next run's smoke test draws)
+# ---------------------------------------------------------------- v1.4.6: viewport, per-resolution layouts
+USC = '/tmp/rh/Arrowhead/Helldivers2/user_settings.config'
+BASE146 = 'transform_ref_h=1440\ncalibrate=false\nv110_migrated=true\nv132_migrated=true\nv142_migrated=true\nv144_migrated=true\nv145_migrated=true\n'
+def lay(rr): return {k: tuple(v.values()) for k, v in rr.globals().SIXTH_SENSE_LAYOUTS.items()}
+def inilay(): m = re.search(r'^radar_layouts=(.*)$', open(INI).read(), re.M); return m.group(1) if m else None
+def runr(rr, n):
+    u = rr.eval('update')
+    for _ in range(n): u(0.016)
+# migration: radar_cx/cy/d -> the 3840x1080 layout (cy, d over the drawable share of the height at 3840x1080)
+open(INI, 'w').write(BASE146 + 'radar_cx=0.4000\nradar_cy=0.5000\nradar_d=0.3000\n')
+r80 = radar_rt('\nBBW, BBH = 3840, 1080'); runr(r80, 220); c80 = r80.globals().SIXTH_SENSE_CAL
+yb38 = min(1, 1080 * 0.9333 * (1080 / 1440) / 1080)
+L80 = lay(r80).get('3840x1080')
+check(L80 and abs(L80[0] - 0.4) < 1e-6 and abs(L80[1] - 0.5 / yb38) < 1e-6 and abs(L80[2] - 0.3 / yb38) < 1e-6, 'v1.4.6 migration: radar_cx/cy/d -> the 3840x1080 layout %s' % (L80,))
+check(inilay() and inilay().startswith('3840x1080:0.4000,') and 'v146_migrated=true' in open(INI).read() and '; radar_layouts (v1.4.6)' in open(INI).read(), 'migration saved once: radar_layouts=%s, v146_migrated, commented' % inilay())
+check(c80.has_saved and abs(c80.cx - 0.4) < 1e-6 and abs(c80.cy - 0.5 / yb38) < 1e-6, 'at 3840x1080 the migrated layout is used (saved)')
+lg80 = open(LOGDIR + '/sixth_sense.log').read()
+check('viewport (load): screen 3840x1080' in lg80 and 'drawable rect x 0..3840' in lg80, 'viewport: line logged with screen, drawable rect and gui size')
+# unseen resolution: from the nearest saved layout; moved there -> saved for it; going back restores each
+r80.execute('BBW, BBH = 2560, 1440'); runr(r80, 80)
+lg80 = open(LOGDIR + '/sixth_sense.log').read()
+check(not c80.has_saved and abs(c80.cx - 0.5) < 1e-9 and abs(c80.cy - 0.5) < 1e-9 and abs(c80.d - 0.35) < 1e-9 and 'viewport: no saved layout for 2560x1440, using centered default' in lg80, 'unseen 2560x1440: centred default (no nearest-layout fallback), logged, not saved yet')
+r80.execute('SIXTH_SENSE_CAL.cx, SIXTH_SENSE_CAL.cy, SIXTH_SENSE_CAL.d, SIXTH_SENSE_CAL.pos_set, SIXTH_SENSE_CAL.dirty, SIXTH_SENSE_CAL.on = 0.25, 0.4, 0.3, true, true, true'); runr(r80, 60)
+L = lay(r80)
+check('2560x1440' in L and abs(L['2560x1440'][0] - 0.25) < 1e-6 and '2560x1440:0.2500,0.4000,0.3000' in inilay() and abs(L['3840x1080'][0] - 0.4) < 1e-6, 'moved at 2560x1440: saved for 2560x1440 only (%s)' % inilay())
+r80.execute('BBW, BBH = 3840, 1080'); runr(r80, 80)
+check(c80.has_saved and abs(c80.cx - 0.4) < 1e-6 and abs(c80.d - 0.3 / yb38) < 1e-6, 'back to 3840x1080: its layout restored')
+r80.execute('BBW, BBH = 2560, 1440'); runr(r80, 80)
+check(c80.has_saved and abs(c80.cx - 0.25) < 1e-6 and abs(c80.cy - 0.4) < 1e-6, 'back to 2560x1440: its layout restored')
+r80.execute('BBW, BBH = 1920, 1200'); runr(r80, 80)
+check('viewport: no saved layout for 1920x1200, using centered default' in open(LOGDIR + '/sixth_sense.log').read() and abs(c80.cx - 0.5) < 1e-9 and abs(c80.cy - 0.5) < 1e-9, 'unseen 1920x1200 with other layouts saved: still the centred default')
+# no layouts at all: default, centred in the drawable area
+open(INI, 'w').write(BASE146 + 'v146_migrated=true\nradar_layouts=\n')
+r81 = radar_rt('\nBBW, BBH = 1920, 1080'); runr(r81, 220); c81 = r81.globals().SIXTH_SENSE_CAL
+check(abs(c81.cx - 0.5) < 1e-9 and abs(c81.cy - 0.5) < 1e-9 and 'viewport: no saved layout for 1920x1080, using centered default' in open(LOGDIR + '/sixth_sense.log').read(), 'no saved layouts: default, logged')
+# drawable-area normalisation: render_resolution 1920x1080 in a 2560x1440 window -> the top-left 1920x1080 is drawable
+os.makedirs(os.path.dirname(USC), exist_ok=True)
+open(USC, 'w').write('render_settings = {\n render_resolution = [ 1920 1080 ]\n}\nscreen_resolution = [ 2560 1440 ]\n')
+open(INI, 'w').write(BASE146 + 'v146_migrated=true\nradar_layouts=2560x1440:0.5000,0.5000,0.3000\n')
+r82 = radar_rt(); runr(r82, 220); c82 = r82.globals().SIXTH_SENSE_CAL; vp = r82.globals().SIXTH_SENSE_VP
+sy82 = 0.9333 * 1440 / 1440; hb = min(1080, 1080 * sy82)
+cxp = (c82.x0 + c82.x1) / 2 * 1.2 * 1440 / 1440; cyp = (1080 - (c82.y0 + c82.y1) / 2) * sy82
+check(vp.w == 1920 and abs(vp.h - hb) < 1e-6 and 'render_resolution 1920x1080' in vp.src, 'viewport: render_resolution 1920x1080 in a 2560x1440 window -> drawable %.0fx%.0f (%s)' % (vp.w, vp.h, vp.src))
+check(abs(cxp - 960) < 1 and abs(cyp - hb / 2) < 1, 'a centred radar sits at the drawable centre (%.0f, %.0f px), not the window centre' % (cxp, cyp))
+check(c82.x1 * 1.2 <= 1920 + 1, 'clamped inside the drawable area')
+os.remove(USC)
+# Reset (Display, two clicks) clears only the current resolution's layout; the Display tab shows the resolution
+open(INI, 'w').write(BASE146.replace('calibrate=false', 'calibrate=true') + 'v146_migrated=true\nradar_layouts=2560x1440:0.3000,0.4000,0.3000;3840x1080:0.6000,0.5000,0.3000\n')
+r83 = radar_rt(); runr(r83, 220); c83 = r83.globals().SIXTH_SENSE_CAL
+check(c83.status == '2560x1440 SAVED LAYOUT', 'Display tab shows the resolution and SAVED LAYOUT (%s)' % c83.status)
+click_tab(r83, 3); click_tab(r83, 3); runr(r83, 60)
+check(inilay() == '3840x1080:0.6000,0.5000,0.3000' and abs(c83.cx - 0.5) < 1e-9 and abs(c83.cy - 0.5) < 1e-9 and not c83.has_saved, 'Reset cleared only 2560x1440 (%s)' % inilay())
+runr(r83, 5); check(c83.status == '2560x1440 NO SAVED LAYOUT', 'then NO SAVED LAYOUT (%s)' % c83.status)
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)

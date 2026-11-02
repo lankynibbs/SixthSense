@@ -55,3 +55,7 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 ## Working preferences (Darryl)
 - Work on `develop`; batch several fixes per build; versioned zips in `C:\Users\kluster\Downloads` on ix.
 - Interactive adjusters over guessing for any uncertain layout.
+
+## Per-resolution layouts (v1.4.6, 2026-11-02)
+- Darryl: the drawable area does not cover the whole window at some resolutions. Chef Shared Loader 1.3.1 had found why on this game: a screen GUI in the game's world shows only the render size's worth of the window (top-left) when Render Scale is below native or the Resolution is below the window. v1.4.6 reads `render_resolution` from `user_settings.config` (as Chef does) and normalises placement to that rect.
+- Layouts saved per window resolution; Darryl asked that unsaved resolutions default to the centre (no nearest-layout fallback).

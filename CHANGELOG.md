@@ -6,6 +6,15 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.4.6] - 2026-11-02
+### Added
+- Drawable-area (viewport) detection from `render_resolution` in the game's settings file; `viewport:` log lines.
+- Per-resolution layouts: `radar_layouts=WxH:cx,cy,d;...`; unsaved resolutions start centred in the drawable area at the default size.
+- Display tab shows the resolution and whether it has a saved layout.
+### Changed
+- Placement is fractions of the drawable area. `radar_cx/cy/d` migrated once as the 3840x1080 layout (`v146_migrated`).
+- Reset and F7-hold reset clear only the current resolution's layout and centre the radar.
+
 ## [1.4.5] - 2026-11-01
 ### Removed
 - HUD visibility mode and its HUD-state probing (the game's HUD toggle can't be read).

@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.5 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.4.6 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -364,3 +364,16 @@ where the camera looks.
 - Visibility is now a choice: Shown / Hidden buttons (the chosen one lit) under the sliders on the F7 page's
   Settings tab, mouse only. Saved as `visibility=shown|hidden` (default shown). The F7 page always shows the radar.
 - A saved `visibility=hud` or `always` becomes `shown` once (v145_migrated).
+
+## v1.4.6 changes
+
+- The drawable area is detected, not assumed: the render size from the game's `user_settings.config`
+  (`render_resolution`, Render Scale or a Resolution below the window), anchored top-left, cut where the gui clips at the
+  bottom. Logged as a `viewport:` line on load, on a resolution change and when the render size changes.
+- Radar placement is stored as fractions of that drawable area, so a centred radar is centred in what you can see.
+- Positions are saved per window resolution in `radar_layouts=WxH:cx,cy,d;...`. Going back to a resolution restores
+  its layout. A resolution with no saved layout starts centred in the drawable area at the default size
+  (`viewport: no saved layout for WxH, using centered default`).
+- The old `radar_cx/cy/d` become the 3840x1080 layout once (`v146_migrated`).
+- Reset (two clicks, or F7 held 3 s) clears only the current resolution's layout and centres the radar.
+- The F7 Display tab shows the resolution and SAVED LAYOUT / NO SAVED LAYOUT.
