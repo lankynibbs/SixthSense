@@ -2,7 +2,7 @@
 
 **A 360° enemy radar HUD for Helldivers 2, running under HellForge with Bingus Shared Loader.**
 
-Version **1.5.4** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
+Version **1.5.5** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
 
 ![Sixth Sense radar preview](docs/images/radar_preview_green.png)
 
@@ -42,7 +42,9 @@ keeps your settings.
 - **Per-resolution layouts**: the radar's place and size are remembered for each screen resolution, and kept
   inside the part of the window the game lets mods draw on (Render Scale aware).
 
-Full controls (mouse and controller): **[CONTROLS.md](CONTROLS.md)**.
+- **Help** button on the F7 page: this README and the full controls guide, built into the mod (works offline).
+
+Full controls (mouse and controller): **[CONTROLS.md](CONTROLS.md)**, also shown in game by **Help**.
 
 ## Settings and logs
 Under HellForge they live in `<HellForge>\userdata\environment\Local\CowboyBingus\Helldivers2\Logs\`
@@ -62,12 +64,14 @@ Settings from the older **Rear Heat HUD** (`rear_heat_hud.ini`) are copied over 
 - Source: `src/sixth_sense.lua` (plus `src/enemy_tiers.lua.inc`). Build: `python3 tools/build.py` writes
   `SixthSense.zip` (needs the sibling `BingusSharedLoader` and `Treasure-Radar` checkouts). Offline test:
   `python3 tests/stub_test.py` (needs `lupa`).
-- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.5.4", the GUID above) and
+- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.5.5", the GUID above) and
   `Addon/9ba626afa44a3aa3.patch_0` with its `.gpu_resources` and `.stream`: the Lua addon plus the textures from
-  `assets/` (the radar disc and the F7 page's word labels). Zips are git-ignored; attach `SixthSense.zip` to a
+  `assets/` (the radar disc, the F7 page's word labels and the Help pages). The Help pages (`assets/help_*.png`)
+  and the text embedded in the Lua are made from README.md and CONTROLS.md by `tools/help_pages.py`, which
+  `tools/build.py` runs before every build. Zips are git-ignored; attach `SixthSense.zip` to a
   release instead of committing it.
 - Changes: [CHANGELOG.md](CHANGELOG.md). Development notes: [docs/history/](docs/history/).
 
 ## Credits
 Bingus Shared Loader (CowboyBingus), HellForge; texture drawing after Treasure Radar; controller discovery after Chef
-Shared Loader; labels set in Poppins Bold (SIL Open Font License).
+Shared Loader; labels set in Poppins Bold (SIL Open Font License); Help pages set in DejaVu Sans (`tools/fonts/`, its licence alongside).

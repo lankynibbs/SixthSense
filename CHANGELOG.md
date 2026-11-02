@@ -5,6 +5,11 @@ Release notes for **Sixth Sense** (formerly **Rear Heat HUD**), newest first. Fo
 Versions before v1.3.2 were built before the repo was put under git and are undated.
 
 ## [Unreleased]
+
+## [1.5.5] - 2026-11-02
+### Added
+- **Help** button (fourth on the F7 page, both tabs): README.md and CONTROLS.md shown in game as pages, rendered to textures and embedded as text at build time (`tools/help_pages.py`, run by `tools/build.py`), so the zip needs nothing else. Mouse: wheel or left / right half turns pages; Help, a click outside, Reset or a tab closes it (no reset, settings untouched). Controller: R3 opens / closes, LB / RB or D-pad left / right pages, B closes Help.
+- CONTROLS.md regenerated for Help.
 ### Changed
 - README rewritten for sharing (what it is, install, features, CONTROLS.md link, release zip contents); the old per-version notes moved to `docs/history/version-notes.md`. Radar preview images in `docs/images/`. Controller confirmed working in game.
 

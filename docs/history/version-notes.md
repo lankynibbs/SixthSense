@@ -450,3 +450,10 @@ where the camera looks.
   nothing; in keyboard / mouse mode the pad is not read at all. With no pad connected, controller mode falls back to
   F7 and the mouse. Pads are found as Chef Shared Loader does on this game (Pad1..Pad8, buttons by the names the pad
   lists). Not yet tested in game. Full map: [CONTROLS.md](CONTROLS.md).
+
+## v1.5.5 changes
+
+- **Help** button on the F7 page (fourth, both tabs) shows README.md and CONTROLS.md in game, as pages rendered at
+  build time (`tools/help_pages.py`, run by `tools/build.py`) with the text embedded in the Lua. Mouse: wheel or the
+  left / right half turns pages; Help, a click outside, Reset or a tab closes it. Controller: R3 opens / closes,
+  LB / RB or D-pad left / right turn pages, B closes Help.

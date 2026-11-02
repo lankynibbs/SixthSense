@@ -89,3 +89,6 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 
 ## Ready for sharing (2026-11-02)
 - Darryl confirmed the v1.5.4 controller works in game and asked to get the mod ready for sharing. README rewritten for a share audience; the long per-version notes moved to `docs/history/version-notes.md`; tinted radar previews in `docs/images/` for a thumbnail. No version bump (docs only).
+
+## Help button (v1.5.5, 2026-11-02)
+- Darryl asked for a Help button showing the how-to docs, and that the README (install and how to use the mod) be included with CONTROLS.md. The game gives a Lua mod no usable text drawing (only rects and textures), so the docs are rendered at build time into 1024x768 page textures (DejaVu Sans) and their text is embedded in the Lua between generated markers; the zip carries both. The page sits in the larger free part of the screen above or below the panel. Controller: R3 (right stick click), the one button not already used on the page.

@@ -1,7 +1,7 @@
-# Sixth Sense: controls (v1.5.4)
+# Sixth Sense: controls (v1.5.5)
 
-> On-request document: written when asked, not updated every commit. It describes v1.5.4
-> (`src/sixth_sense.lua`); regenerated for the v1.5.4 controller option. For an overview see [README.md](README.md), per-version notes [docs/history/version-notes.md](docs/history/version-notes.md), and [CHANGELOG.md](CHANGELOG.md).
+> On-request document: written when asked, not updated every commit. It describes v1.5.5
+> (`src/sixth_sense.lua`); regenerated for the v1.5.5 Help button. The same text is built into the mod: press Help on the F7 page. For an overview see [README.md](README.md), per-version notes [docs/history/version-notes.md](docs/history/version-notes.md), and [CHANGELOG.md](CHANGELOG.md).
 
 Sixth Sense is a 360° enemy radar that turns with your view (up is where you look). Red
 squares are enemies, red diamonds are enemy structures (turrets), the white square in the middle is you.
@@ -24,7 +24,7 @@ squares are enemies, red diamonds are enemy structures (turrets), the white squa
 - **F7** opens and closes the setup page (mouse cursor shown, the camera holds still while it is open). Opening and
   closing both save. It always opens on the Display tab. The key is `toggle_key=f7` in the ini.
 - Everything on the page is done with the **mouse**. There are no `[ ]` or F8 bindings (HellForge itself uses F8).
-- The page has three buttons at the top of its panel: **Display**, **Settings**, **Reset**. The panel places itself
+- The page has four buttons at the top of its panel: **Display**, **Settings**, **Reset**, **Help**. The panel places itself
   where the radar is not, and moves out of the way when you drop the radar.
 
 ### Display tab: place the radar
@@ -51,6 +51,12 @@ Drag a slider's knob or click/drag along its track. The yellow tick marks the de
 - **Visibility: Shown / Hidden** (two buttons under the sliders). Hidden takes the radar off screen during play; the
   F7 page still shows it so you can set it up.
 
+### Help
+- **Help** (the fourth button, both tabs) shows this guide and the README (what the mod is, install, features)
+  inside the game, as pages. **Mouse wheel**, or a click on the **left / right half** of the page, turns pages.
+- Close it with **Help** again, a **click outside** the page, or a click on **Reset** or a tab (Reset is not armed;
+  your radar settings are untouched). Closing the F7 page also closes Help.
+
 ### Reset
 - **Reset button**: click once to arm it (lit for 3 s), click again within 3 s to confirm.
   - On **Display**: the radar goes back to the centre of the drawable area at the default size, and the saved layout
@@ -68,9 +74,12 @@ reports (Xbox and PlayStation names both). The log says `controller: Pad1 (<name
 |---|---|
 | Open / close the page | hold **View / Back** (Xbox) or **touchpad** (PlayStation) **2 s** |
 | Panic reset (like F7 held 3 s) | keep holding View / touchpad to **5 s**: layout reset, page open on Display |
-| Close the page (saved) | **B / Circle** |
+| Close the page (saved) | **B / Circle** (with Help open, B closes Help first) |
 | Display / Settings tab | **LB / RB** (L1 / R1), either one flips the tab |
 | Reset (arm, then confirm within 3 s) | **X / Square**, twice |
+| Help (open / close) | **R3** (click the right stick) |
+| Help: turn pages | **LB / RB** or **D-pad left / right** |
+| Help: close (the page stays open) | **B / Circle** or **R3** |
 | Display: move the radar | **D-pad** (hold repeats; faster after 1 s) |
 | Display: bigger / smaller | **Y / Triangle** / **A / Cross** (hold repeats) |
 | Settings: pick a row | **D-pad up / down** (Size, Sensitivity, Repeat rate, Dot size, Radar color, Visibility, Controls); the row is framed yellow |

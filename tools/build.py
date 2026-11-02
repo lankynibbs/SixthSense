@@ -6,7 +6,7 @@ import argparse, json, struct, sys, uuid, zipfile
 from pathlib import Path
 HERE = Path(__file__).resolve().parents[1]
 RES = HERE.parent
-sys.path.insert(0, str(RES / 'BingusSharedLoader/scripts')); sys.path.insert(0, str(RES / 'Treasure-Radar/src'))
+sys.path.insert(0, str(RES / 'BingusSharedLoader/scripts')); sys.path.insert(0, str(HERE / 'tools')); sys.path.insert(0, str(RES / 'Treasure-Radar/src'))
 from build_addon import entry_source
 from archive import ARCHIVE, resource_hash, make_archive
 import patch_writer
@@ -15,7 +15,7 @@ from PIL import Image
 NAME = 'mods/darryl/sixth_sense'
 # (the textures keep their v1.3 resource paths: their ids are named in the Lua; the GUID is unchanged)
 TEXTURES = [('mods/darryl/rear_heat_hud/radar_disc', 'radar_disc.png')] + [
-    ('mods/darryl/rear_heat_hud/label_' + k, 'label_%s.png' % k) for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size', 'radar_color', 'controls', 'ctl_kbm', 'ctl_pad', 'visibility', 'vis_shown', 'vis_hidden', 'tab_display', 'tab_settings', 'tab_reset')]
+    ('mods/darryl/rear_heat_hud/label_' + k, 'label_%s.png' % k) for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size', 'radar_color', 'controls', 'tab_help', 'ctl_kbm', 'ctl_pad', 'visibility', 'vis_shown', 'vis_hidden', 'tab_display', 'tab_settings', 'tab_reset')]
 LUA, TEXTURE = 0xA14E8DFA2CD117E2, 0xCD4238C6A0C69E32
 
 def texture_resource(w, h):
@@ -33,9 +33,11 @@ def main():
     ap.add_argument('--output', default=str(HERE / 'SixthSense.zip'))
     ap.add_argument('--no-texture', action='store_true')
     a = ap.parse_args()
+    import help_pages                                 # v1.5.5: README.md + CONTROLS.md -> help page textures + embedded text
+    textures = TEXTURES + help_pages.generate()
     src = (HERE / 'src/sixth_sense.lua').read_bytes()
     version = src.split(b'"sixth_sense", "')[1].split(b'"')[0].decode()
-    for name, _ in TEXTURES:
+    for name, _ in textures:
         assert ('%016x' % resource_hash(name)).encode() in src, 'the Lua must name the texture id of ' + name
     body = entry_source(NAME, src)
     lua_res = struct.pack('<II', len(body), 2) + body
@@ -43,7 +45,7 @@ def main():
         toc, gpu, stream = make_archive({resource_hash(NAME): lua_res}), b'', b''
     else:
         entries = [(resource_hash(NAME), LUA, lua_res, b'', b'', 16)]
-        for name, png in TEXTURES:
+        for name, png in textures:
             img = Image.open(HERE / 'assets' / png).convert('RGBA')
             entries.append((resource_hash(name), TEXTURE, texture_resource(img.width, img.height), img.tobytes(), b'', 64))
         toc, gpu, stream = patch_writer.write(entries, [(LUA, 16), (TEXTURE, 64)], pad_toc=True)
@@ -59,7 +61,7 @@ def main():
         for p, c in sorted(files.items()):
             info = zipfile.ZipInfo(p, date_time=(1980, 1, 1, 0, 0, 0)); info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o100644 << 16; z.writestr(info, c)
-    print('Built %s (%s, textures %s)' % (a.output, title, 'none' if a.no_texture else len(TEXTURES)))
+    print('Built %s (%s, textures %s)' % (a.output, title, 'none' if a.no_texture else len(textures)))
 
 if __name__ == '__main__':
     main()
