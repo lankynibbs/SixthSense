@@ -6,6 +6,10 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-02
+### Removed
+- Mark and Pick (v1.4.8 / v1.4.9), at Darryl's request: the F7 buttons, `MARK` / `PICK` log lines, `MARKED:` text, the radar blink ring, `picked_ids` ini persistence, and the Mark / Pick label textures. F7 page is Display / Settings / Reset.
+
 ## [1.4.9] - 2026-11-02
 ### Changed
 - Pick split into **Mark** (locks the unit at the crosshair: `MARK id <hex> ...`, `MARKED: <id>` on the F7 page, dot blinks) and **Pick** (logs the marked unit, `PICK id <hex> ...`, no re-aim; `PICK: no mark set` without one). Darryl rejected aim-at-click Pick.

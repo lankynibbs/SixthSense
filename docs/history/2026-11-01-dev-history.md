@@ -71,3 +71,6 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 
 ## Mark then Pick (v1.4.9, 2026-11-02)
 - Darryl rejected v1.4.8's aim-at-click Pick: he wants to mark a unit first and then pick (log) it with the aim free. Mark uses the v1.4.8 targeting and stores the unit; Pick logs the stored unit's id (re-reading its position) and never re-aims.
+
+## Mark and Pick removed (v1.5.0, 2026-11-02)
+- At Darryl's request, Mark and Pick were removed completely: buttons 4 and 5, the targeting code, `MARK` / `PICK` log lines, `MARKED:` F7 text, the radar blink ring, `picked_ids` persistence and the Mark / Pick label textures. The F7 panel shrank to three buttons (Display, Settings, Reset). Their stub tests were replaced by a check that none of it remains.

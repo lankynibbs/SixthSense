@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.9 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.5.0 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -405,3 +405,11 @@ where the camera looks.
   `MARKED: <id>` with name and distance, and its radar dot blinks for 2 s. **Pick** (button 5) logs the already marked
   unit as `PICK id <16 hex> name ... (marked at <time> ...)` without aiming again, so you can aim anywhere after
   marking; with no mark it logs `PICK: no mark set`. Picks count in `picked_ids`. A Mark that finds nothing clears the mark.
+
+## v1.5.0 changes
+
+- **Mark and Pick removed** at Darryl's request: no Mark or Pick buttons on the F7 page, no `MARK` / `PICK` log lines,
+  no `MARKED:` text, no radar blink ring, and the `picked_ids` ini key is no longer written (an old value is ignored).
+  The `Mark` / `Pick` label textures are gone from the zip. The F7 page now has Display, Settings and Reset only;
+  everything else (radar, tabs, Shown / Hidden, per-resolution layouts, viewport) is unchanged. The v1.4.8 / v1.4.9
+  notes above are history.
