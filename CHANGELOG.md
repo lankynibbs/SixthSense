@@ -6,6 +6,12 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.4.9] - 2026-11-02
+### Changed
+- Pick split into **Mark** (locks the unit at the crosshair: `MARK id <hex> ...`, `MARKED: <id>` on the F7 page, dot blinks) and **Pick** (logs the marked unit, `PICK id <hex> ...`, no re-aim; `PICK: no mark set` without one). Darryl rejected aim-at-click Pick.
+### Fixed
+- Panel auto-placement keeps the whole (wider) panel above the gui's clipped bottom.
+
 ## [1.4.8] - 2026-11-02
 ### Added
 - Pick debug button on the F7 page (mouse only): the unit nearest the crosshair is logged as `PICK id <hex> name ... class ... dist ...`, shown large on the F7 page until the next pick, and ringed on the radar for 2 s; `picked_ids=id:count` in the ini. (Automatic discovery mode declined by Darryl.)

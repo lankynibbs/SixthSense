@@ -68,3 +68,6 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 ## Pick debug control (v1.4.8, 2026-11-02)
 - Darryl declined an automatic discovery mode and asked for a control to mark a unit he sees and print its id. Pick scores every live unit (World.units, runtime-built skipped) by angle off the camera's 3D forward ray within 12 degrees and 250 m, with a small bonus for known/listed/animated units over props; fallbacks: 2D view direction (20 degrees), then nearest unit.
 - Per Darryl: the id is the first field (`PICK id <hex>`) for Ctrl+F and copy, and it stays on screen (`PICKED: <id>`) until the next pick.
+
+## Mark then Pick (v1.4.9, 2026-11-02)
+- Darryl rejected v1.4.8's aim-at-click Pick: he wants to mark a unit first and then pick (log) it with the aim free. Mark uses the v1.4.8 targeting and stores the unit; Pick logs the stored unit's id (re-reading its position) and never re-aims.

@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.4.8 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.4.9 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.4.8"
+local MOD, VERSION = "sixth_sense", "1.4.9"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -1396,14 +1396,14 @@ local TABS = { { id = "display", label = "tab_display" }, { id = "settings", lab
 local function tab_rect(i)
   local vw, vtop = CAL.bw, CFG.gy_top
   local w, h = 200 / CFG.sx_scale, 48 / CFG.sy_scale
-  local x = clamp((CAL.pfx or CFG.panel_fx) * vw, 0, vw - 4 * w - 36 / CFG.sx_scale)
+  local x = clamp((CAL.pfx or CFG.panel_fx) * vw, 0, vw - 5 * w - 48 / CFG.sx_scale)
   local top = clamp(vtop - (CAL.pfy or CFG.panel_fy) * CAL.bh, h, vtop)
   return x + (i - 1) * (w + 12 / CFG.sx_scale), top - h, w, h
 end
 -- the panel's bounding box (tabs, Move and the slider stack with labels and values), gui units
 local function panel_box()
   local x0, y0, w, h = tab_rect(1)
-  local x1, y1 = x0 + 4 * w + 36 / CFG.sx_scale, y0 + h + 82 / CFG.sy_scale   -- (v1.4.8: the Picked text above)
+  local x1, y1 = x0 + 5 * w + 48 / CFG.sx_scale, y0 + h + 82 / CFG.sy_scale   -- (v1.4.8: the Picked text above)
   for i = 1, #SL do
     local tx, ty, tw, th = slider_rect(i)
     x0 = math.min(x0, tx - 150 / CFG.sx_scale); x1 = math.max(x1, tx + tw + 140 / CFG.sx_scale)
@@ -1426,15 +1426,16 @@ local function panel_place(why)
   local spots = { { fx, fy }, { fx, 1 - fy - ph }, { 1 - fx - pw, fy }, { 1 - fx - pw, 1 - fy - ph } }
   local best, bestov = 1, 1e18
   for i = 1, #spots do
-    CAL.pfx, CAL.pfy = clamp(spots[i][1], 0, 0.9), clamp(spots[i][2], 0, 0.9)
+    CAL.pfx, CAL.pfy = clamp(spots[i][1], 0, math.max(0, math.min(0.9, 1 - pw))), clamp(spots[i][2], 0, math.max(0, math.min(0.9, ybot() - ph)))   -- (v1.4.9: the whole panel fits)
     local a, b, c, d = panel_box()
     local ow = math.max(0, math.min(c, CAL.x1) - math.max(a, CAL.x0))
     local oh = math.max(0, math.min(d, CAL.y1) - math.max(b, CAL.y0))
     if ow * oh < bestov then best, bestov = i, ow * oh end
     if ow * oh <= 0 then break end
   end
-  local nfx, nfy = clamp(spots[best][1], 0, 0.9), clamp(spots[best][2], 0, 0.9)
-  if nfx ~= CAL.lpfx or nfy ~= CAL.lpfy then
+  local nfx, nfy = clamp(spots[best][1], 0, math.max(0, math.min(0.9, 1 - pw))), clamp(spots[best][2], 0, math.max(0, math.min(0.9, ybot() - ph)))
+  if nfx ~= CAL.lpfx or nfy ~= CAL.lpfy or (bestov > 0 and why ~= CAL.lpwhy) then
+    CAL.lpwhy = bestov > 0 and why or nil
     say(string.format("panel: at %.2f, %.2f of the screen (%s; spot %d, overlap with the radar %s)", nfx, nfy, why or "-", best, bestov > 0 and "yes, least" or "none"))
   end
   CAL.pfx, CAL.pfy, CAL.lpfx, CAL.lpfy = nfx, nfy, nfx, nfy
@@ -1480,11 +1481,11 @@ local function pick_ids_str()
   for i = 1, math.min(#arr, 20) do out[#out + 1] = arr[i][1] .. ":" .. arr[i][2] end
   return table.concat(out, ",")
 end
-local function pick_click()
+local function mark_click()
   local stamp = os.date("%H:%M:%S")
   local w = S.world
   local us = w and call("World", "units", w)
-  if type(us) ~= "table" then PICK.text1, PICK.text2 = "PICKED: NONE", "NO UNIT FOUND"; say("PICK: no unit found at " .. stamp .. " (World.units gave nothing: no world yet?)"); return end
+  if type(us) ~= "table" then PICK.mark = nil; PICK.text1, PICK.text2 = "MARKED: NONE", "NO UNIT FOUND"; say("MARK: no unit found at " .. stamp .. " (World.units gave nothing: no world yet?)"); return end
   -- the aim: camera position and 3D forward
   local cu = find_camera(w)
   local c = cu and call("Unit", "camera", cu, 1)
@@ -1500,7 +1501,7 @@ local function pick_click()
   local ox, oy, oz = cx, cy, cz
   if not method then
     if S.bx then ox, oy, oz = S.bx, S.by, 0 elseif S.px then ox, oy, oz = S.px, S.py, S.pz or 0 end
-    if not ox then PICK.text1, PICK.text2 = "PICKED: NONE", "NO UNIT FOUND"; say("PICK: no unit found at " .. stamp .. " (no camera and no player position)"); return end
+    if not ox then PICK.mark = nil; PICK.text1, PICK.text2 = "MARKED: NONE", "NO UNIT FOUND"; say("MARK: no unit found at " .. stamp .. " (no camera and no player position)"); return end
     method = "nearest unit to me (no camera direction)"
   end
   local best, bs, n, nlive = nil, nil, 0, 0
@@ -1534,8 +1535,8 @@ local function pick_click()
     end
   end
   if not best then
-    PICK.text1, PICK.text2 = "PICKED: NONE", "NO UNIT FOUND"
-    say(string.format("PICK: no unit found at %s (%s: %d live units, none within %s 250 m)", stamp, method, nlive, cone and (cone .. " degrees of the aim and") or ""))
+    PICK.mark = nil; PICK.text1, PICK.text2 = "MARKED: NONE", "NO UNIT FOUND"
+    say(string.format("MARK: no unit found at %s (%s: %d live units, none within %s 250 m)", stamp, method, nlive, cone and (cone .. " degrees of the aim and") or ""))
     return
   end
   local h, e = best.h, S.T[best.u]
@@ -1545,12 +1546,32 @@ local function pick_click()
   local inradar = e and e.show and e.x and "yes" or "no"
   kind, enemy = kind:gsub("[%s,()]+", "_"):gsub("_$", ""), enemy:gsub("[%s()]+", "_"):gsub("_$", "")   -- (class is one token)
   local nm = NAME[h] or STATIC[h] or "UNKNOWN"
-  say(string.format("PICK id %s name %s class %s/%s/%s/%s dist %.0fm pos (%.1f,%.1f,%.1f) in radar %s known-list %s time %s (method %s, %.1f deg off the aim, %d candidates)",
-    h, nm, size, kind, best.asm and "animated" or "static", enemy, best.d, best.x, best.y, best.z,
-    inradar, (TIER[h] or STATIC[h]) and "yes" or "no", stamp, method, best.ang, n))
-  PICK.text1 = "PICKED: " .. h                       -- (on the F7 page until the next pick)
+  local cls = string.format("%s/%s/%s/%s", size, kind, best.asm and "animated" or "static", enemy)
+  local known = (TIER[h] or STATIC[h]) and "yes" or "no"
+  say(string.format("MARK id %s name %s class %s dist %.0fm pos (%.1f,%.1f,%.1f) in radar %s known-list %s time %s (method %s, %.1f deg off the aim, %d candidates)",
+    h, nm, cls, best.d, best.x, best.y, best.z, inradar, known, stamp, method, best.ang, n))
+  PICK.mark = { u = best.u, h = h, nm = nm, cls = cls, known = known, d = best.d, x = best.x, y = best.y, z = best.z, t = stamp, method = method }
+  PICK.text1 = "MARKED: " .. h                       -- (on the F7 page until the next Mark)
   PICK.text2 = string.format("%s  %.0fM", nm, best.d)
   PICK.u, PICK.until_t, PICK.x, PICK.y, PICK.hex = best.u, S.t + 2, best.x, best.y, h
+end
+-- v1.4.9 Pick: logs the MARKED unit (no aiming: aim anywhere after marking), blinks its dot, counts picked_ids
+local function pick_click()
+  local M = PICK.mark
+  if not M then say("PICK: no mark set (click Mark first, with the unit at the crosshair)"); return end
+  local alive = call("Unit", "alive", M.u) == true
+  if alive then local x, y, z = pos(M.u); if x then M.x, M.y, M.z = x, y, z or 0 end end
+  local ox, oy, oz = S.bx or S.px, S.by or S.py, S.pz or 0
+  local d = M.d
+  if ox then local dx, dy, dz = M.x - ox, M.y - oy, M.z - (S.bx and M.z or oz); d = math.sqrt(dx * dx + dy * dy + dz * dz) end
+  local e = S.T[M.u]
+  say(string.format("PICK id %s name %s class %s dist %.0fm pos (%.1f,%.1f,%.1f) in radar %s known-list %s time %s (marked at %s by %s, unit %s)",
+    M.h, M.nm, M.cls, d, M.x, M.y, M.z, e and e.show and e.x and "yes" or "no", M.known, os.date("%H:%M:%S"), M.t, M.method, alive and "alive" or "gone"))
+  M.d = d
+  PICK.text2 = string.format("%s  %.0fM", M.nm, d)
+  PICK.u, PICK.until_t, PICK.x, PICK.y, PICK.hex = alive and M.u or nil, S.t + 2, M.x, M.y, M.h
+  if not alive then PICK.u = M.u end
+  local h = M.h
   PICK.ids[h] = (PICK.ids[h] or 0) + 1
   CFG.picked_ids = pick_ids_str()
   say("picked ids: " .. CFG.picked_ids)
@@ -1585,8 +1606,12 @@ local function cal_input(sw, sh, gx, gy)
       local x, y, w, h = tab_rect(3)
       if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; reset_click(sw, sh) end
     end
-    if not CAL.drag then                         -- v1.4.8: Pick (both tabs)
+    if not CAL.drag then                         -- v1.4.9: Mark (button 4) and Pick (button 5), both tabs
       local x, y, w, h = tab_rect(4)
+      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; PICK.mlit = S.t + 0.3; mark_click() end
+    end
+    if not CAL.drag then
+      local x, y, w, h = tab_rect(5)
       if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; PICK.lit = S.t + 0.3; pick_click() end
     end
     for i = 1, (CAL.drag or disp) and 0 or #VIS_BTN do          -- v1.4.5: Shown / Hidden (a click picks one)
@@ -1787,12 +1812,13 @@ local LABEL_TEX = {
   sensitivity = { '7a7091af0d8c0316', 180, 48 },
   repeat_rate = { 'ae02fd6005683294', 196, 48 },
   dot_size = { '8024c7d02d7bd868', 136, 48 },
+  tab_mark = { '518fa2dd6374302e', 96, 48 },
   tab_pick = { '11475e32c4f8afc1', 80, 48 },
   visibility = { '9f6f6ca838a05cdf', 152, 48 },
   vis_shown = { 'ebe63964e4089a54', 120, 48 },
   vis_hidden = { '5d673ce754dcc40d', 128, 48 },
 }
-local LABEL_WORD = { tab_reset = "RESET", tab_pick = "PICK", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
+local LABEL_WORD = { tab_reset = "RESET", tab_pick = "PICK", tab_mark = "MARK", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
 local GLYPH = {
   ["0"] = "01110100011001110101110011000101110", ["1"] = "00100011000010000100001000010001110",
   ["2"] = "01110100010000100010001000100011111", ["3"] = "11110000010000101110000010000111110",
@@ -1967,7 +1993,7 @@ local function draw()
     local px0, py0, px1, py1 = panel_box()
     if CAL.tab == "settings" then gbox(px0, py0, px1 - px0, py1 - py0, 150, 10, 14, 20)   -- a dark backing
     else
-      local x, y, w, h = tab_rect(1); gbox(x - 6 / SX, y - 48 / SY, 4 * w + 48 / SX, h + 54 / SY, 150, 10, 14, 20)
+      local x, y, w, h = tab_rect(1); gbox(x - 6 / SX, y - 48 / SY, 5 * w + 60 / SX, h + 54 / SY, 150, 10, 14, 20)
       -- v1.4.6: this resolution and whether it has a saved layout (green) or not yet (amber)
       local txt = string.format("%dx%d %s", CAL.sw or 0, CAL.sh or 0, CAL.has_saved and "SAVED LAYOUT" or "NO SAVED LAYOUT")
       CAL.status = txt
@@ -1982,11 +2008,12 @@ local function draw()
     end
     for i = 1, #TABS do button(i, TABS[i].label, CAL.tab == TABS[i].id) end   -- the tab buttons; the active one lit
     button(3, "tab_reset", CAL.armed ~= nil and S.t < CAL.armed)              -- Reset (both tabs), lit while armed
-    button(4, "tab_pick", PICK.lit ~= nil and S.t < PICK.lit)                 -- v1.4.8: Pick (debug), lit as clicked
+    button(4, "tab_mark", (PICK.mlit ~= nil and S.t < PICK.mlit) or PICK.mark ~= nil)   -- v1.4.9: Mark, lit while a mark is set
+    button(5, "tab_pick", PICK.lit ~= nil and S.t < PICK.lit)                 -- Pick (logs the mark), lit as clicked
     if PICK.text1 then                                                       -- the last pick, large, above the buttons
       local x, y, w, h = tab_rect(1)
       local l1, l2 = PICK.text1, PICK.text2 and PICK.text2:upper() or ""
-      gbox(x - 6 / SX, y + h + 6 / SY, 4 * w + 48 / SX, 76 / SY, 190, 10, 14, 20)
+      gbox(x - 6 / SX, y + h + 6 / SY, 5 * w + 60 / SX, 76 / SY, 190, 10, 14, 20)
       pixel_text(gbox, l1, x + 6 / SX, y + h + 58 / SY, 4 * kk, "left", 255, 255, 255, 255)
       pixel_text(gbox, l2, x + 6 / SX, y + h + 24 / SY, 3 * kk, "left", 240, 255, 220, 120)
     end

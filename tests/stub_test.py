@@ -534,7 +534,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.4.8 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.4.9 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -771,33 +771,41 @@ Unit.has_animation_state_machine = function(u) if u == TUR or u == PROP then ret
 """
 open(INI, 'w').write(BASE146.replace('calibrate=false', 'calibrate=true') + 'v146_migrated=true\nradar_layouts=\n')
 rp = radar_rt(PICKX); runr(rp, 220); gp = rp.globals(); PK = gp.SIXTH_SENSE_PICK
-def picks(): return [l for l in open(LOGDIR + '/sixth_sense.log').read().splitlines() if ' PICK' in l]
-def do_pick(): click_tab(rp, 4); runr(rp, 2); return picks()[-1]
-# crosshair straight ahead: the Charger at (0, 20) (the unknown at 11 degrees and the prop at 45 are off the aim)
+def picks(): return [l for l in open(LOGDIR + '/sixth_sense.log').read().splitlines() if ' PICK' in l or ' MARK' in l]
+def do_mark(): click_tab(rp, 4); runr(rp, 2); return picks()[-1]
+def do_pick(): click_tab(rp, 5); runr(rp, 2); return picks()[-1]
+# Pick before any Mark
+l = do_pick()
+check(l.split(' ', 1)[1].startswith('PICK: no mark set'), 'Pick with no mark: "PICK: no mark set"')
+# Mark: the unit nearest the crosshair (Charger straight ahead)
+l = do_mark()
+m = re.match(r'^\S+ MARK id ([0-9a-f]{16}) name (.+?) class (\S+) dist (\d+)m pos \(', l)
+check(m and m.group(1) == '1a7fcdff98c664b0' and 'known-list yes' in l and 'method camera 3D forward ray' in l, 'Mark locks the unit at the crosshair (Charger): %s' % l[9:120])
+check(PK.text1 == 'MARKED: 1a7fcdff98c664b0' and 'M' in PK.text2, 'MARKED id shown on the F7 page (%s / %s)' % (PK.text1, PK.text2))
+runr(rp, 30); check((PK.drawn or 0) > 0 and PK.u is not None, 'marked unit highlighted on the radar')
+# aim moves away; Pick still logs the marked Charger
+gp.FWDX, gp.FWDY = 0, -1; runr(rp, 140)
 l = do_pick()
 m = re.match(r'^\S+ PICK id ([0-9a-f]{16}) name (.+?) class (\S+) dist (\d+)m pos \(', l)
-check(m and m.group(1) == '1a7fcdff98c664b0' and 'known-list yes' in l and 'in radar yes' in l and 'method camera 3D forward ray' in l, 'Pick: the unit nearest the crosshair (Charger), "PICK id <16 hex>" first: %s' % l[9:120])
-check(PK.text1 == 'PICKED: 1a7fcdff98c664b0' and 'M' in PK.text2, 'Picked id shown on the F7 page (%s / %s)' % (PK.text1, PK.text2))
-runr(rp, 30); check((PK.drawn or 0) > 0 and PK.u is not None, 'picked unit highlighted on the radar')
-runr(rp, 140); check(PK.u is None and PK.text1 == 'PICKED: 1a7fcdff98c664b0', 'highlight gone after 2 s; the on-screen id stays until the next pick')
-# aim at the unknown unit (beyond the radar's range is fine)
+check(m and m.group(1) == '1a7fcdff98c664b0' and 'marked at' in l and 'unit alive' in l and PK.text1 == 'MARKED: 1a7fcdff98c664b0', 'Pick after the aim moved logs the MARKED unit, not the aim: %s' % l[9:120])
+l = do_pick()
+check(dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get('picked_ids', '').startswith('1a7fcdff98c664b0:2') and '; picked_ids (v1.4.8)' in open(INI).read(), 'picked_ids counts Picks (%s)' % dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get('picked_ids'))
+# Mark an unknown unit, then a static turret
 gp.FWDX, gp.FWDY = 8 / 40.8, 40 / 40.8
-l = do_pick(); do_pick()
-check(' PICK id abcdef0123456789 name UNKNOWN ' in l and 'known-list no' in l and 'in radar no' in l and re.search(r' class \S+/unknown dist \d+m ', l), 'Pick: an unknown id, not on the radar: %s' % l[9:160])
-check(dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get('picked_ids', '').startswith('abcdef0123456789:2,1a7fcdff98c664b0:1') and '; picked_ids (v1.4.8)' in open(INI).read(), 'picked_ids builds up in the ini (%s)' % dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get('picked_ids'))
-check(any(l2.endswith('picked ids: abcdef0123456789:2,1a7fcdff98c664b0:1') for l2 in open(LOGDIR + '/sixth_sense.log').read().splitlines()), 'picked ids summary logged')
-# a static turret candidate (no animation state machine)
+l = do_mark(); l2 = do_pick()
+check(' MARK id abcdef0123456789 name UNKNOWN ' in l and ' PICK id abcdef0123456789 name UNKNOWN ' in l2 and 'known-list no' in l2 and re.search(r' class \S+/unknown dist \d+m ', l2), 'unknown id marked and picked')
 gp.FWDX, gp.FWDY = -1, 0
-l = do_pick()
-check(' PICK id 2cf3488c4845f8bd name Cannon Turret ' in l and re.search(r' class medium/static(-list)?/static/enemy_structure dist ', l) and 'known-list yes' in l, 'Pick: a static turret: %s' % l[9:170])
-# nothing in the aim cone
+l = do_mark()
+check(' MARK id 2cf3488c4845f8bd name Cannon Turret ' in l and re.search(r' class medium/static(-list)?/static/enemy_structure dist ', l) and 'known-list yes' in l, 'static turret marked: %s' % l[9:150])
+# Mark with nothing in the cone clears the mark
 gp.FWDX, gp.FWDY = 0, -1
-l = do_pick()
-check(l.split(' ', 1)[1].startswith('PICK: no unit found') and 'degrees of the aim' in l and PK.text1 == 'PICKED: NONE', 'Pick: no unit -> "PICK: no unit found" with the reason; screen says NONE')
-# mouse only: no key does it
+l = do_mark()
+check(l.split(' ', 1)[1].startswith('MARK: no unit found') and PK.text1 == 'MARKED: NONE', 'Mark with nothing aimed at: "MARK: no unit found", MARKED: NONE')
+l = do_pick(); check(l.split(' ', 1)[1].startswith('PICK: no mark set'), 'then Pick: no mark set')
+# mouse only: no key marks or picks
 n0 = len(picks())
 for k in range(2, 16): rp.execute('PRESSED[%d] = true' % k); runr(rp, 1); rp.execute('PRESSED = {}'); runr(rp, 1)
-check(len(picks()) == n0 and "PICK" not in open('src/sixth_sense.lua').read().split('kpressed(')[1][:40], 'Pick is mouse only: no key picks')
+check(len(picks()) == n0, 'Mark and Pick are mouse only: no key does either')
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)
