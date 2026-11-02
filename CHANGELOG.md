@@ -1,10 +1,12 @@
 # Changelog
 
-Release notes for **Sixth Sense** (formerly **Rear Heat HUD**), newest first. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Full per-version detail is in the README's version sections; the story behind them is in [docs/history/](docs/history/).
+Release notes for **Sixth Sense** (formerly **Rear Heat HUD**), newest first. Format loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Full per-version detail is in [docs/history/version-notes.md](docs/history/version-notes.md); the story behind them is in [docs/history/](docs/history/).
 
 Versions before v1.3.2 were built before the repo was put under git and are undated.
 
 ## [Unreleased]
+### Changed
+- README rewritten for sharing (what it is, install, features, CONTROLS.md link, release zip contents); the old per-version notes moved to `docs/history/version-notes.md`. Radar preview images in `docs/images/`. Controller confirmed working in game.
 
 ## [1.5.4] - 2026-11-02
 ### Added

@@ -1,7 +1,7 @@
 # Sixth Sense: controls (v1.5.4)
 
 > On-request document: written when asked, not updated every commit. It describes v1.5.4
-> (`src/sixth_sense.lua`); regenerated for the v1.5.4 controller option. For per-version notes see [README.md](README.md) and [CHANGELOG.md](CHANGELOG.md).
+> (`src/sixth_sense.lua`); regenerated for the v1.5.4 controller option. For an overview see [README.md](README.md), per-version notes [docs/history/version-notes.md](docs/history/version-notes.md), and [CHANGELOG.md](CHANGELOG.md).
 
 Sixth Sense is a 360° enemy radar that turns with your view (up is where you look). Red
 squares are enemies, red diamonds are enemy structures (turrets), the white square in the middle is you.
@@ -80,7 +80,7 @@ reports (Xbox and PlayStation names both). The log says `controller: Pad1 (<name
   mission View / touchpad also opens the map and the D-pad / face buttons do their game actions. Nothing is read
   from the pad except that hold while the page is closed.
 - No `[ ]` or F8 bindings in either scheme (F8 is HellForge's editor).
-- Not yet tested in game (offline stub test only).
+- Confirmed working in game (v1.5.4).
 
 ## Per-resolution layouts and the drawable area
 - The radar's place and size are saved **per window resolution** (`radar_layouts=WxH:cx,cy,d;...`). Switching back to
