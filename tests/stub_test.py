@@ -534,7 +534,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.5.0 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.5.1 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -764,6 +764,46 @@ rp = radar_rt(''); runr(rp, 220)
 for i in (4, 5): click_tab(rp, i); runr(rp, 2)
 lgp = open(LOGDIR + '/sixth_sense.log').read()
 check(not re.search(r' (MARK|PICK)\b', lgp) and 'MARKED' not in lgp and 'picked_ids' not in open(INI).read(), 'v1.5.0: clicks where Mark / Pick were log nothing; no picked_ids in the ini')
+# ---------------------------------------------------------------- v1.5.1: radar colours (mouse only)
+PAL = {'green': ((90, 255, 140), (255, 40, 40)), 'white': ((235, 235, 235), (255, 255, 255)), 'yellow': ((255, 225, 60), (255, 240, 0)),
+       'red': ((255, 70, 60), (255, 20, 20)), 'light_blue': ((110, 200, 255), (160, 225, 255))}
+ORDER = ['green', 'white', 'yellow', 'red', 'light_blue']
+FINDCFG = 'local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end\nHUD_CFG = find(find(update, "step"), "CFG")'
+COLX = '\nCOLS = {}\nlocal gr = Gui.rect\nGui.rect = function(g, p, sz, c) COLS[c[2] .. "," .. c[3] .. "," .. c[4]] = true; return gr(g, p, sz, c) end\nHUD_CFG.radar_style = "dots"'
+open(INI, 'w').write(BASE146.replace('calibrate=false', 'calibrate=true') + 'v146_migrated=true\nradar_layouts=\n')
+rc = radar_rt(COLX); uc = rc.eval('update'); gc = rc.globals(); CC = gc.HUD_CFG
+def runc(sec):
+    for _ in range(max(1, int(sec / 0.016))): uc(0.016)
+def cols(): rc.execute('COLS = {}'); runc(0.1); return set(k for k, v in gc.COLS.items())
+def inival(k): return dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get(k)
+runc(3.5)
+check(CC.radar_color == 'green', 'default radar_color is green')
+cs = cols(); check('90,255,140' in cs and '255,40,40' in cs, 'default: green rings / cross hairs, red enemy dots (unchanged look)')
+click_tab(rc, 2); runc(0.5)
+tx, ty, tw, th = rc.eval('function(i) return SIXTH_SENSE_SLIDER(i) end')(5)
+for name in ['white', 'yellow', 'red', 'light_blue', 'green']:
+    frac = min(max(ORDER.index(name) / 4, 0.02), 0.98)
+    gc.MX, gc.MY = to_window(tx + tw * 0.5, ty + th / 2); runc(0.02); gc.LMB = 1; runc(0.02)
+    gc.MX, gc.MY = to_window(tx + tw * frac, ty + th / 2); runc(0.05); gc.LMB = 0; runc(1.2)
+    ring_, dot_ = PAL[name]; cs = cols()
+    check(CC.radar_color == name and inival('radar_color') == name and '; radar_color (v1.5.1)' in open(INI).read(), 'Radar color slider -> %s, saved with its comment (ini %s)' % (name, inival('radar_color')))
+    check('%d,%d,%d' % ring_ in cs and '%d,%d,%d' % dot_ in cs, '%s: rings / cross hairs %s and enemy dots %s drawn' % (name, ring_, dot_))
+CC.radar_color = 'yellow'
+for k in range(2, 16): rc.execute('PRESSED[%d] = true' % k); runc(0.02); rc.execute('PRESSED = {}'); runc(0.02)
+check(CC.radar_color == 'yellow', 'radar_color is mouse only: no key changes it')
+rc.execute('SIXTH_SENSE_CAL.dirty = true'); runc(1.2)
+r2c = runtime(); r2c.execute(FINDCFG)
+check(r2c.globals().HUD_CFG.radar_color == 'yellow', 'restart loads radar_color=yellow from the ini')
+click_tab(rc, 3); runc(0.1); click_tab(rc, 3); runc(1.2)
+check(CC.radar_color == 'green' and inival('radar_color') == 'green', 'Reset on Settings restores radar_color=green (saved)')
+open(INI, 'a').write('radar_color=purple\n')
+r3c = runtime(); r3c.execute(FINDCFG)
+check(r3c.globals().HUD_CFG.radar_color == 'green', 'unknown radar_color -> green')
+TEXC = EXTRA.replace('Gui.bitmap = function(g, mat, p, sz, c) BITMAPS = BITMAPS + 1 end', 'TINTS = {}\nGui.bitmap = function(g, mat, p, sz, c) BITMAPS = BITMAPS + 1; TINTS[c[2] .. "," .. c[3] .. "," .. c[4]] = true end') + '\nHUD_CFG.radar_color = "light_blue"'
+rt_ = radar_rt(TEXC); ut_ = rt_.eval('update')
+for _ in range(220): ut_(0.016)
+tints = set(k for k, v in rt_.globals().TINTS.items())
+check(rt_.globals().SIXTH_SENSE_RADAR.style == 'texture' and '110,200,255' in tints, 'texture disc tinted light_blue (%s)' % sorted(tints))
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)

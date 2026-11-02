@@ -74,3 +74,6 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 
 ## Mark and Pick removed (v1.5.0, 2026-11-02)
 - At Darryl's request, Mark and Pick were removed completely: buttons 4 and 5, the targeting code, `MARK` / `PICK` log lines, `MARKED:` F7 text, the radar blink ring, `picked_ids` persistence and the Mark / Pick label textures. The F7 panel shrank to three buttons (Display, Settings, Reset). Their stub tests were replaced by a check that none of it remains.
+
+## Radar colours (v1.5.1, 2026-11-02)
+- Darryl asked for colour options besides green: white, yellow, red, light blue. Added as a fifth snap slider (mouse only, like Dot size) with a swatch instead of a text value (the pixel font lacks some letters). To recolour the disc without five textures, `radar_disc.png` is now white lines on a neutral dark fill and tinted through the `Color` argument of `Gui.bitmap` (not yet proven in game: if the engine ignores the tint the disc shows white). Green keeps red enemy dots so the default is unchanged; other colours use a brighter dot of the same hue. Enemy structures stay orange.

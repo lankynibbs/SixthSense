@@ -6,6 +6,12 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-11-02
+### Added
+- Radar colours: green (default), white, yellow, red, light blue. "Radar color" snap slider on the F7 Settings tab (mouse only) with a swatch; tints the disc, rings, cross hairs and enemy dots (enemy structures stay orange). `radar_color` in the ini with a comment; Reset restores green.
+### Changed
+- The radar disc texture is drawn white and tinted in game (`Gui.bitmap` colour); green looks as before.
+
 ## [1.5.0] - 2026-11-02
 ### Removed
 - Mark and Pick (v1.4.8 / v1.4.9), at Darryl's request: the F7 buttons, `MARK` / `PICK` log lines, `MARKED:` text, the radar blink ring, `picked_ids` ini persistence, and the Mark / Pick label textures. F7 page is Display / Settings / Reset.

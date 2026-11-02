@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.5.0 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.5.1 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.5.0"
+local MOD, VERSION = "sixth_sense", "1.5.1"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -83,7 +83,7 @@ local function say(s)
 end
 
 -- ---------------------------------------------------------------- config
-local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, v145_migrated = false, v146_migrated = false, radar_layouts = "", visibility = "shown", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
+local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_color = "green", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, v145_migrated = false, v146_migrated = false, radar_layouts = "", visibility = "shown", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
               detect = "both", discovery = true, discovery_static = false, discovery_range = 80, candidate_weight = 1.5,
               debug = false }
 local CFG_TEXT = [[
@@ -144,6 +144,10 @@ radar_style=auto
 ; reset to medium once, so everyone sees the bigger v1.4.4 dots.)
 dot_size=medium
 v144_migrated=true
+; radar_color (v1.5.1): the radar's colour (disc, rings, cross hairs, enemy dots): green (default), white, yellow,
+; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
+; Enemy structures stay orange diamonds in every colour.
+radar_color=green
 ; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
 ; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
 ; hud and always became shown once.)
@@ -205,6 +209,20 @@ local LAYOUTS_COMMENT = [[; radar_layouts (v1.4.6): the radar's place saved per 
 ; user_settings.config (APPDATA, LOCALAPPDATA, then HellForge's userdata\profiles\*; render_resolution) anchored
 ; top-left, cut at the bottom where the game clips the gui (see the "viewport:" lines in sixth_sense.log). Going back
 ; to a resolution restores its layout; one with none saved starts centred in the drawable area at the default size. Reset (two clicks, or F7 held 3 s) clears only the current resolution's entry. Written by calibration.]]
+local COLOR_COMMENT = [[; radar_color (v1.5.1): the radar's colour (disc, rings, cross hairs, enemy dots): green (default), white, yellow,
+; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
+; Enemy structures stay orange diamonds in every colour.]]
+-- v1.5.1 radar colours: ring = disc tint, rings and cross hairs; dot = enemy dots (green keeps its red dots)
+local COLOR_NAMES = { "green", "white", "yellow", "red", "light_blue" }
+local COLOR_IDX = { green = 1, white = 2, yellow = 3, red = 4, light_blue = 5 }
+local PALETTE = {
+  green = { ring = { 90, 255, 140 }, dot = { 255, 40, 40 } },
+  white = { ring = { 235, 235, 235 }, dot = { 255, 255, 255 } },
+  yellow = { ring = { 255, 225, 60 }, dot = { 255, 240, 0 } },
+  red = { ring = { 255, 70, 60 }, dot = { 255, 20, 20 } },
+  light_blue = { ring = { 110, 200, 255 }, dot = { 160, 225, 255 } },
+}
+_G.SIXTH_SENSE_PALETTE = PALETTE
 local VIS_COMMENT = [[; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
 ; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
 ; hud and always became shown once.)]]
@@ -247,6 +265,7 @@ do
   CFG.radar_fx = clamp(CFG.radar_fx, 0, 1); CFG.radar_fy = clamp(CFG.radar_fy, 0, 1)
   CFG.radar_style = tostring(CFG.radar_style):lower(); if CFG.radar_style ~= "texture" and CFG.radar_style ~= "dots" then CFG.radar_style = "auto" end
   CFG.visibility = tostring(CFG.visibility):lower(); if CFG.visibility ~= "hidden" and CFG.visibility ~= "hud" then CFG.visibility = "shown" end   -- (hud: migrated below)
+  CFG.radar_color = tostring(CFG.radar_color):lower():gsub("[%s-]+", "_"); if not COLOR_IDX[CFG.radar_color] then CFG.radar_color = "green" end
   CFG.dot_size = tostring(CFG.dot_size):lower(); if CFG.dot_size ~= "small" and CFG.dot_size ~= "large" then CFG.dot_size = "medium" end
   if CFG.sx_scale <= 0 then CFG.sx_scale = 1.2 end; if CFG.sy_scale <= 0 then CFG.sy_scale = 0.9333 end
   CFG.discovery_range = clamp(CFG.discovery_range, 10, 300); CFG.candidate_weight = clamp(CFG.candidate_weight, 0, 10)
@@ -1331,10 +1350,10 @@ local function cal_save(why, sw, sh)
   if CAL.pos_set and CAL.key then LAYOUTS[CAL.key] = { CAL.cx, CAL.cy, CAL.d }; CAL.has_saved = true end   -- (moved or resized here)
   CFG.radar_layouts = layouts_str()
   local kv = { calibrate = tostring(CAL.on), toggle_key = KEYNAMES.toggle[1], radar_layouts = CFG.radar_layouts, panel_fx = string.format("%.2f", CFG.panel_fx), panel_fy = string.format("%.2f", CFG.panel_fy),
-               sensitivity = string.format("%.2f", CFG.sensitivity), repeat_rate = string.format("%.2f", CFG.repeat_rate), dot_size = CFG.dot_size, visibility = CFG.visibility,
-               __order = { "calibrate", "toggle_key", "radar_layouts", "panel_fx", "panel_fy", "sensitivity", "repeat_rate", "dot_size", "visibility" },
-               __comment = { visibility = VIS_COMMENT, radar_layouts = LAYOUTS_COMMENT } }
-  say("settings " .. why .. ": dot_size " .. CFG.dot_size .. ", visibility " .. CFG.visibility)
+               sensitivity = string.format("%.2f", CFG.sensitivity), repeat_rate = string.format("%.2f", CFG.repeat_rate), dot_size = CFG.dot_size, radar_color = CFG.radar_color, visibility = CFG.visibility,
+               __order = { "calibrate", "toggle_key", "radar_layouts", "panel_fx", "panel_fy", "sensitivity", "repeat_rate", "dot_size", "radar_color", "visibility" },
+               __comment = { radar_color = COLOR_COMMENT, visibility = VIS_COMMENT, radar_layouts = LAYOUTS_COMMENT } }
+  say("settings " .. why .. ": dot_size " .. CFG.dot_size .. ", radar_color " .. CFG.radar_color .. ", visibility " .. CFG.visibility)
   say(string.format("settings %s: sensitivity %.2f (range %.0f m, gain x%.2f), repeat_rate %.2f (re-acquire %.2f s, hold %.2f s, fade %.2f s)",
     why, CFG.sensitivity, clamp(CFG.range * CFG.sensitivity, 10, 120), CFG.sensitivity, CFG.repeat_rate,
     0.5 / CFG.repeat_rate, 1.0 / CFG.repeat_rate, 1.5 / CFG.repeat_rate))
@@ -1352,6 +1371,9 @@ local SL = {
     set = function(v) CFG.repeat_rate = clamp(v, 0.25, 3); CAL.dirty = true end },
   { name = "dot_size", min = 1, max = 3, tick = 2, rgb = { 255, 50, 50 }, get = function() return DOT_IDX_[CFG.dot_size] or 2 end,
     set = function(v) local n = DOT_NAMES_[clamp(math.floor(v + 0.5), 1, 3)]; if n ~= CFG.dot_size then CFG.dot_size = n; CAL.dirty = true end end },
+  -- v1.5.1: 5 radar_color (white track): 5 snap positions, green white yellow red light_blue; the value is a colour swatch
+  { name = "radar_color", min = 1, max = 5, tick = 1, rgb = { 230, 230, 230 }, get = function() return COLOR_IDX[CFG.radar_color] or 1 end,
+    set = function(v) local n = COLOR_NAMES[clamp(math.floor(v + 0.5), 1, 5)]; if n ~= CFG.radar_color then CFG.radar_color = n; CAL.dirty = true; say("radar_color: " .. n) end end },
 }
 local function slider_rect(i)
   i = i or 1
@@ -1446,8 +1468,8 @@ local function reset_click(sw, sh)
   if CAL.armed and S.t < CAL.armed then
     CAL.armed = nil
     if CAL.tab == "settings" then
-      CFG.sensitivity, CFG.repeat_rate, CFG.dot_size, CFG.visibility = 1.0, 1.0, "medium", "shown"; set_scale(D_DEF)
-      say("reset (Settings, confirmed): size, sensitivity, repeat_rate, dot_size and visibility back to their defaults")
+      CFG.sensitivity, CFG.repeat_rate, CFG.dot_size, CFG.radar_color, CFG.visibility = 1.0, 1.0, "medium", "green", "shown"; set_scale(D_DEF)
+      say("reset (Settings, confirmed): size, sensitivity, repeat_rate, dot_size, radar_color and visibility back to their defaults")
     else reset_pos("Display, confirmed") end
     cal_save("reset", sw, sh); panel_place("reset")
   else
@@ -1542,7 +1564,7 @@ local function id64(h) return call("IdString64", "from_hex", h) end
 -- for the session and its caller draws its own fallback. GUIs are dropped untouched on a world change (RAD_RESET).
 -- Size: Gui.bitmap's size comes out in screen px while its position follows the gui transform (v1.3 in game: the
 -- disc drawn with gui-unit sizes was tall and skinny, 1.2/0.9333 = 1.29 too narrow). tex_size_px=false: v1.3's way.
-local function tex_draw(hex, x, y, w, h, what)
+local function tex_draw(hex, x, y, w, h, what, rgb)
   local st = RAD.tex[hex]
   if st == nil then st = { state = nil }; RAD.tex[hex] = st end
   if st.state == false then return false end
@@ -1563,7 +1585,7 @@ local function tex_draw(hex, x, y, w, h, what)
       if not mh then error("Gui.material gave nothing") end
       fn("Material", "set_texture")(mh, id64(UI_SLOT), id64(hex))
     end
-    fn("Gui", "bitmap")(st.gui, id64(UI_MATERIAL), ctor("Vector3", x, y, LAYER_NOW > 950 and 995 or 900), ctor("Vector2", w, h), ctor("Color", 255, 255, 255, 255))
+    fn("Gui", "bitmap")(st.gui, id64(UI_MATERIAL), ctor("Vector3", x, y, LAYER_NOW > 950 and 995 or 900), ctor("Vector2", w, h), ctor("Color", 255, rgb and rgb[1] or 255, rgb and rgb[2] or 255, rgb and rgb[3] or 255))
   end)
   if st.state == nil then
     say("bitmap " .. (what or hex) .. ": draw " .. (ok and "succeeded" or ("failed: " .. tostring(err) .. " -> fallback")))
@@ -1574,17 +1596,17 @@ local function tex_draw(hex, x, y, w, h, what)
   return ok
 end
 -- a texture centred at gui (cx, cy), wpx x hpx screen px
-local function tex_centred(hex, cx, cy, wpx, hpx, what)
+local function tex_centred(hex, cx, cy, wpx, hpx, what, rgb)
   local SX, SY = CFG.sx_scale, CFG.sy_scale
   local w, h = wpx, hpx
   if not CFG.tex_size_px then w, h = wpx / SX, hpx / SY end
-  return tex_draw(hex, cx - wpx / 2 / SX, cy - hpx / 2 / SY, w, h, what)
+  return tex_draw(hex, cx - wpx / 2 / SX, cy - hpx / 2 / SY, w, h, what, rgb)
 end
-local function ring(gbox, cx, cy, rx, ry, n, px, SX, SY, a)
+local function ring(gbox, cx, cy, rx, ry, n, px, SX, SY, a, c)
   local w, h = px / SX, px / SY
   for k = 0, n - 1 do
     local t = k / n * 2 * math.pi
-    gbox(cx + math.sin(t) * rx - w / 2, cy + math.cos(t) * ry - h / 2, w, h, a, 90, 255, 140)
+    gbox(cx + math.sin(t) * rx - w / 2, cy + math.cos(t) * ry - h / 2, w, h, a, c[1], c[2], c[3])
   end
 end
 -- (x, y) in the world -> radar gui point; f = share of the range (clamped to the rim), faded = beyond range
@@ -1606,17 +1628,20 @@ local function draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
   local R = clamp(CFG.range * CFG.sensitivity, 10, 120)
   local before = S.draw_ok + S.draw_fail
   local style = "dots"
+  local PC = PALETTE[CFG.radar_color] or PALETTE.green
+  local RC, DC = PC.ring, PC.dot
+  I.color = CFG.radar_color
   if CFG.radar_style ~= "dots" then
     local d = 2 * rpx / TEX_RIM                   -- the texture's size in screen px (its rim on the overlay's circle)
-    if tex_centred(TEX_HEX, cx, cy, d * CFG.radar_aspect, d, "radar disc") then style = "texture" end
+    if tex_centred(TEX_HEX, cx, cy, d * CFG.radar_aspect, d, "radar disc", RC) then style = "texture" end
   end
   if style == "dots" then
     local k = sh / 1080 * sc
-    ring(gbox, cx, cy, rx, ry, 80, 4 * k, SX, SY, 220)                        -- the rim
-    ring(gbox, cx, cy, rx * 2 / 3, ry * 2 / 3, 48, 3 * k, SX, SY, 130)        -- 2/3 of the range
-    ring(gbox, cx, cy, rx / 3, ry / 3, 32, 3 * k, SX, SY, 130)                -- 1/3
-    gbox(cx - rx, cy - 1 * k / SY, 2 * rx, 2 * k / SY, 90, 90, 255, 140)      -- cross hairs
-    gbox(cx - 1 * k / SX, cy - ry, 2 * k / SX, 2 * ry, 90, 90, 255, 140)
+    ring(gbox, cx, cy, rx, ry, 80, 4 * k, SX, SY, 220, RC)                        -- the rim
+    ring(gbox, cx, cy, rx * 2 / 3, ry * 2 / 3, 48, 3 * k, SX, SY, 130, RC)        -- 2/3 of the range
+    ring(gbox, cx, cy, rx / 3, ry / 3, 32, 3 * k, SX, SY, 130, RC)                -- 1/3
+    gbox(cx - rx, cy - 1 * k / SY, 2 * rx, 2 * k / SY, 90, RC[1], RC[2], RC[3])      -- cross hairs
+    gbox(cx - 1 * k / SX, cy - ry, 2 * k / SX, 2 * ry, 90, RC[1], RC[2], RC[3])
   end
   local k = sh / 1080 * sc
   gbox(cx - 5 * k / SX, cy - 5 * k / SY, 10 * k / SX, 10 * k / SY, 255, 255, 255, 255)   -- me, facing up
@@ -1640,7 +1665,7 @@ local function draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
         gbox(px - w * 0.2, py - h * 0.5, w * 0.4, h * 0.3, a, 255, 110, 20)
       else
         local w, h = s / SX, s / SY
-        gbox(px - w / 2, py - h / 2, w, h, a, 255, 40, 40)
+        gbox(px - w / 2, py - h / 2, w, h, a, DC[1], DC[2], DC[3])
       end
       ndots = ndots + 1
     end
@@ -1670,11 +1695,12 @@ local LABEL_TEX = {
   sensitivity = { '7a7091af0d8c0316', 180, 48 },
   repeat_rate = { 'ae02fd6005683294', 196, 48 },
   dot_size = { '8024c7d02d7bd868', 136, 48 },
+  radar_color = { '05ff3e115296cc83', 196, 48 },
   visibility = { '9f6f6ca838a05cdf', 152, 48 },
   vis_shown = { 'ebe63964e4089a54', 120, 48 },
   vis_hidden = { '5d673ce754dcc40d', 128, 48 },
 }
-local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
+local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", radar_color = "RADAR COLOR", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
 local GLYPH = {
   ["0"] = "01110100011001110101110011000101110", ["1"] = "00100011000010000100001000010001110",
   ["2"] = "01110100010000100010001000100011111", ["3"] = "11110000010000101110000010000111110",
@@ -1875,7 +1901,13 @@ local function draw()
       local one = tx + tw * ((d.tick or 1) - d.min) / (d.max - d.min)
       local k = sh / 1080
       draw_label(gbox, d.name == "scale" and "size" or d.name, tx - 16 / SX, ty + th / 2, k)
+      if d.name == "radar_color" then                                     -- v1.5.1: a swatch of the colour (ring, with its dot inside)
+        local c = (PALETTE[CFG.radar_color] or PALETTE.green)
+        gbox(tx + tw + 18 / SX, ty + th / 2 - 14 / SY, 56 / SX, 28 / SY, 255, c.ring[1], c.ring[2], c.ring[3])
+        gbox(tx + tw + 38 / SX, ty + th / 2 - 6 / SY, 16 / SX, 12 / SY, 255, c.dot[1], c.dot[2], c.dot[3])
+      else
       pixel_text(gbox, slider_value(i), tx + tw + 18 / SX, ty + th / 2, 2 * k, "left", 240, d.rgb[1], d.rgb[2], d.rgb[3])
+      end
       gbox(one - 1 / SX, ty - 6 / SY, 2 / SX, th + 12 / SY, 230, 255, 255, 0)
     end
     do                                                                       -- v1.4.5: Shown / Hidden buttons

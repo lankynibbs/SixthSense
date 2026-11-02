@@ -15,7 +15,7 @@ from PIL import Image
 NAME = 'mods/darryl/sixth_sense'
 # (the textures keep their v1.3 resource paths: their ids are named in the Lua; the GUID is unchanged)
 TEXTURES = [('mods/darryl/rear_heat_hud/radar_disc', 'radar_disc.png')] + [
-    ('mods/darryl/rear_heat_hud/label_' + k, 'label_%s.png' % k) for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size', 'visibility', 'vis_shown', 'vis_hidden', 'tab_display', 'tab_settings', 'tab_reset')]
+    ('mods/darryl/rear_heat_hud/label_' + k, 'label_%s.png' % k) for k in ('size', 'sensitivity', 'repeat_rate', 'dot_size', 'radar_color', 'visibility', 'vis_shown', 'vis_hidden', 'tab_display', 'tab_settings', 'tab_reset')]
 LUA, TEXTURE = 0xA14E8DFA2CD117E2, 0xCD4238C6A0C69E32
 
 def texture_resource(w, h):
