@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.4.7 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.4.8 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.4.7"
+local MOD, VERSION = "sixth_sense", "1.4.8"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -83,7 +83,7 @@ local function say(s)
 end
 
 -- ---------------------------------------------------------------- config
-local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, v145_migrated = false, v146_migrated = false, radar_layouts = "", visibility = "shown", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
+local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, v145_migrated = false, v146_migrated = false, radar_layouts = "", picked_ids = "", visibility = "shown", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
               detect = "both", discovery = true, discovery_static = false, discovery_range = 80, candidate_weight = 1.5,
               debug = false }
 local CFG_TEXT = [[
@@ -176,6 +176,10 @@ panel_fy=0.08
 ; to a resolution restores its layout; one with none saved starts centred in the drawable area at the default size. Reset (two clicks, or F7 held 3 s) clears only the current resolution's entry. Written by calibration.
 radar_layouts=
 v146_migrated=true
+; picked_ids (v1.4.8): what the Pick button on the F7 page found, as id:count entries (most picked first, up to 20),
+; e.g. picked_ids=1a7fcdff98c664b0:3,2cf3488c4845f8bd:1. Pick the same unseen sentry a few times to collect its id
+; (then add it to static_ids). Each pick is also a "PICK" line in sixth_sense.log. Delete the value to start over.
+picked_ids=
 ; (until v1.4.5) radar placement: radar_cx, radar_cy = the radar's centre as fractions of the visible
 ; screen (cy from the top), radar_d = its diameter as a fraction of the screen height. Written by calibration; the
 ; area_* / radar_fx / radar_fy / radar_size keys were converted into these once (v142_migrated) and are no longer used.
@@ -198,6 +202,9 @@ discovery_range=80
 candidate_weight=1.5
 debug=false
 ]]
+local PICK_COMMENT = [[; picked_ids (v1.4.8): what the Pick button on the F7 page found, as id:count entries (most picked first, up to 20),
+; e.g. picked_ids=1a7fcdff98c664b0:3,2cf3488c4845f8bd:1. Pick the same unseen sentry a few times to collect its id
+; (then add it to static_ids). Each pick is also a "PICK" line in sixth_sense.log. Delete the value to start over.]]
 local LAYOUTS_COMMENT = [[; radar_layouts (v1.4.6): the radar's place saved per window resolution, WxH:cx,cy,d entries separated by ";", e.g.
 ;   radar_layouts=3840x1080:0.5000,0.7500,0.3500;2560x1440:0.3000,0.6000,0.3000
 ; cx, cy = the radar's centre as fractions of the DRAWABLE area (cy from its top), d = its diameter as a fraction of
@@ -1389,14 +1396,14 @@ local TABS = { { id = "display", label = "tab_display" }, { id = "settings", lab
 local function tab_rect(i)
   local vw, vtop = CAL.bw, CFG.gy_top
   local w, h = 200 / CFG.sx_scale, 48 / CFG.sy_scale
-  local x = clamp((CAL.pfx or CFG.panel_fx) * vw, 0, vw - 3 * w - 24 / CFG.sx_scale)
+  local x = clamp((CAL.pfx or CFG.panel_fx) * vw, 0, vw - 4 * w - 36 / CFG.sx_scale)
   local top = clamp(vtop - (CAL.pfy or CFG.panel_fy) * CAL.bh, h, vtop)
   return x + (i - 1) * (w + 12 / CFG.sx_scale), top - h, w, h
 end
 -- the panel's bounding box (tabs, Move and the slider stack with labels and values), gui units
 local function panel_box()
   local x0, y0, w, h = tab_rect(1)
-  local x1, y1 = x0 + 3 * w + 24 / CFG.sx_scale, y0 + h
+  local x1, y1 = x0 + 4 * w + 36 / CFG.sx_scale, y0 + h + 82 / CFG.sy_scale   -- (v1.4.8: the Picked text above)
   for i = 1, #SL do
     local tx, ty, tw, th = slider_rect(i)
     x0 = math.min(x0, tx - 150 / CFG.sx_scale); x1 = math.max(x1, tx + tw + 140 / CFG.sx_scale)
@@ -1454,6 +1461,101 @@ local function reset_click(sw, sh)
     say("reset: armed for 3 s (" .. CAL.tab .. "), click Reset again to confirm")
   end
 end
+-- ---------------------------------------------------------------- v1.4.8: Pick (debug), mouse only
+-- The Pick button (F7 page, both tabs) marks the unit at the crosshair and logs its id. Aim at it, open F7 (the
+-- camera holds still while the page is up), click Pick. Every live unit of the world (World.units, all of them, once
+-- per click; runtime-built ones skipped: asking their position ends the game) within 250 m is scored by its angle off
+-- the camera's 3D forward ray (Camera.world_rotation + Quaternion.forward; the crosshair sits on that ray in the
+-- third-person view, close enough at range), inside a 12 degree cone. Animated, known or listed-structure units get a
+-- small bonus over props (rocks, buildings), and nearer ones win a tie. Without a 3D forward: the 2D view direction,
+-- 20 degree cone; without a camera: the nearest unit to me. Not limited to the radar's range or what it tracks.
+local PICK = { u = nil, until_t = 0, ids = {}, order = {} }
+_G.SIXTH_SENSE_PICK = PICK                        -- (read by the stub test)
+for h, n in tostring(CFG.picked_ids or ""):gmatch("(%x+):(%d+)") do if #h == 16 then PICK.ids[h:lower()] = tonumber(n) end end
+local function pick_ids_str()
+  local arr = {}
+  for h, n in pairs(PICK.ids) do arr[#arr + 1] = { h, n } end
+  table.sort(arr, function(a, b) if a[2] ~= b[2] then return a[2] > b[2] end return a[1] < b[1] end)
+  local out = {}
+  for i = 1, math.min(#arr, 20) do out[#out + 1] = arr[i][1] .. ":" .. arr[i][2] end
+  return table.concat(out, ",")
+end
+local function pick_click()
+  local stamp = os.date("%H:%M:%S")
+  local w = S.world
+  local us = w and call("World", "units", w)
+  if type(us) ~= "table" then PICK.text1, PICK.text2 = "PICKED: NONE", "NO UNIT FOUND"; say("PICK: no unit found at " .. stamp .. " (World.units gave nothing: no world yet?)"); return end
+  -- the aim: camera position and 3D forward
+  local cu = find_camera(w)
+  local c = cu and call("Unit", "camera", cu, 1)
+  local cx, cy, cz = call("Vector3", "to_elements", c and call("Camera", "world_position", c))
+  local rot = c and call("Camera", "world_rotation", c)
+  local fx, fy, fz = call("Vector3", "to_elements", rot and call("Quaternion", "forward", rot))
+  local method, cone
+  if type(cx) == "number" and type(fx) == "number" and type(fz) == "number" then
+    local l = math.sqrt(fx * fx + fy * fy + fz * fz)
+    if l > 1e-4 then fx, fy, fz = fx / l, fy / l, fz / l; method, cone = "camera 3D forward ray (crosshair)", 12 end
+  end
+  if not method and S.px and S.fx then cx, cy, cz, fx, fy, fz, method, cone = S.px, S.py, S.pz or 0, S.fx, S.fy, nil, "2D view direction (no 3D forward)", 20 end
+  local ox, oy, oz = cx, cy, cz
+  if not method then
+    if S.bx then ox, oy, oz = S.bx, S.by, 0 elseif S.px then ox, oy, oz = S.px, S.py, S.pz or 0 end
+    if not ox then PICK.text1, PICK.text2 = "PICKED: NONE", "NO UNIT FOUND"; say("PICK: no unit found at " .. stamp .. " (no camera and no player position)"); return end
+    method = "nearest unit to me (no camera direction)"
+  end
+  local best, bs, n, nlive = nil, nil, 0, 0
+  for i = 1, #us do
+    local u = us[i]
+    if u ~= cu and call("Unit", "alive", u) == true then
+      local h = hex_of(u)
+      if h and h ~= RUNTIME_HEX then
+        nlive = nlive + 1
+        local x, y, z = pos(u)
+        if x then
+          local dx, dy, dz = x - ox, y - oy, (z or 0) - (oz or 0)
+          local d3 = math.sqrt(dx * dx + dy * dy + dz * dz)
+          local d2 = math.sqrt(dx * dx + dy * dy)
+          local me = h == "4d1c334d294dfa97" and d2 < 8          -- (my own Helldiver)
+          if not me and d3 > 1.5 and d3 <= 250 then
+            local ang, ok = 0, true
+            if fz then ang = math.deg(math.acos(clamp((dx * fx + dy * fy + dz * fz) / d3, -1, 1)))
+            elseif fx then ang = math.deg(math.acos(clamp((dx * fx + dy * fy) / math.max(d2, 1e-6), -1, 1))) end
+            if cone and ang > cone then ok = false end
+            if ok then
+              n = n + 1
+              local asm = call("Unit", "has_animation_state_machine", u) == true
+              local bonus = (TIER[h] or STATIC[h]) and 3 or (asm and 1.5 or 0)
+              local score = cone and (ang - bonus + d3 * 0.01) or d3
+              if not bs or score < bs then bs = score; best = { u = u, h = h, x = x, y = y, z = z or 0, d = d3, d2 = d2, ang = ang, asm = asm } end
+            end
+          end
+        end
+      end
+    end
+  end
+  if not best then
+    PICK.text1, PICK.text2 = "PICKED: NONE", "NO UNIT FOUND"
+    say(string.format("PICK: no unit found at %s (%s: %d live units, none within %s 250 m)", stamp, method, nlive, cone and (cone .. " degrees of the aim and") or ""))
+    return
+  end
+  local h, e = best.h, S.T[best.u]
+  local kind = e and e.kind or (STATIC[h] and "static-list") or (TIER[h] and "known-list") or (best.asm and "animated, untracked") or "prop (no animation), untracked"
+  local size = e and e.size or (SIZE_OF[h] or (TIER[h] and TIER_SIZE[TIER[h]]) or "-")
+  local enemy = TIER[h] and ("enemy t" .. TIER[h]) or (STATIC[h] and "enemy structure") or (IGNORE[h] and "ignored (pod/ours)") or (FRIENDLY[h] and "friendly") or "unknown"
+  local inradar = e and e.show and e.x and "yes" or "no"
+  kind, enemy = kind:gsub("[%s,()]+", "_"):gsub("_$", ""), enemy:gsub("[%s()]+", "_"):gsub("_$", "")   -- (class is one token)
+  local nm = NAME[h] or STATIC[h] or "UNKNOWN"
+  say(string.format("PICK id %s name %s class %s/%s/%s/%s dist %.0fm pos (%.1f,%.1f,%.1f) in radar %s known-list %s time %s (method %s, %.1f deg off the aim, %d candidates)",
+    h, nm, size, kind, best.asm and "animated" or "static", enemy, best.d, best.x, best.y, best.z,
+    inradar, (TIER[h] or STATIC[h]) and "yes" or "no", stamp, method, best.ang, n))
+  PICK.text1 = "PICKED: " .. h                       -- (on the F7 page until the next pick)
+  PICK.text2 = string.format("%s  %.0fM", nm, best.d)
+  PICK.u, PICK.until_t, PICK.x, PICK.y, PICK.hex = best.u, S.t + 2, best.x, best.y, h
+  PICK.ids[h] = (PICK.ids[h] or 0) + 1
+  CFG.picked_ids = pick_ids_str()
+  say("picked ids: " .. CFG.picked_ids)
+  ini_save({ picked_ids = CFG.picked_ids, __order = { "picked_ids" }, __comment = { picked_ids = PICK_COMMENT } })
+end
 -- one frame of calibration input (mx, my: the cursor in gui units)
 local function cal_input(sw, sh, gx, gy)
   local sh_ = kdown("shift")
@@ -1482,6 +1584,10 @@ local function cal_input(sw, sh, gx, gy)
     if not CAL.drag then
       local x, y, w, h = tab_rect(3)
       if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; reset_click(sw, sh) end
+    end
+    if not CAL.drag then                         -- v1.4.8: Pick (both tabs)
+      local x, y, w, h = tab_rect(4)
+      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; PICK.lit = S.t + 0.3; pick_click() end
     end
     for i = 1, (CAL.drag or disp) and 0 or #VIS_BTN do          -- v1.4.5: Shown / Hidden (a click picks one)
       local x, y, w, h = vis_rect(i)
@@ -1652,6 +1758,18 @@ local function draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
       if age > hold + fade then S.ghost[u] = nil
       else dot(g.x, g.y, 200 * (age <= hold and 1 or (1 - (age - hold) / fade)), g.size, g.static) end
     end
+    -- v1.4.8: the picked unit: a blinking white ring for 2 s (on the rim if beyond range)
+    if PICK.u and S.t < PICK.until_t then
+      if call("Unit", "alive", PICK.u) == true then local x, y = pos(PICK.u); if x then PICK.x, PICK.y = x, y end end
+      local fx, fy = project(PICK.x, PICK.y, ox, oy, R)
+      local px, py = cx + fx * rx, cy + fy * ry
+      local s = base * 70
+      local a = (math.floor(S.t * 6) % 2 == 0) and 255 or 150
+      local w, h, t1, t2 = s / SX, s / SY, 4 * k / SX, 4 * k / SY
+      gbox(px - w / 2, py + h / 2 - t2, w, t2, a, 255, 255, 255); gbox(px - w / 2, py - h / 2, w, t2, a, 255, 255, 255)
+      gbox(px - w / 2, py - h / 2, t1, h, a, 255, 255, 255); gbox(px + w / 2 - t1, py - h / 2, t1, h, a, 255, 255, 255)
+      PICK.drawn = (PICK.drawn or 0) + 1
+    elseif PICK.u then PICK.u = nil end
   end
   I.cx, I.cy, I.rx, I.ry, I.R, I.style, I.dots = cx, cy, rx, ry, R, style, ndots
   I.rects = S.draw_ok + S.draw_fail - before
@@ -1669,11 +1787,12 @@ local LABEL_TEX = {
   sensitivity = { '7a7091af0d8c0316', 180, 48 },
   repeat_rate = { 'ae02fd6005683294', 196, 48 },
   dot_size = { '8024c7d02d7bd868', 136, 48 },
+  tab_pick = { '11475e32c4f8afc1', 80, 48 },
   visibility = { '9f6f6ca838a05cdf', 152, 48 },
   vis_shown = { 'ebe63964e4089a54', 120, 48 },
   vis_hidden = { '5d673ce754dcc40d', 128, 48 },
 }
-local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
+local LABEL_WORD = { tab_reset = "RESET", tab_pick = "PICK", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
 local GLYPH = {
   ["0"] = "01110100011001110101110011000101110", ["1"] = "00100011000010000100001000010001110",
   ["2"] = "01110100010000100010001000100011111", ["3"] = "11110000010000101110000010000111110",
@@ -1691,6 +1810,12 @@ local GLYPH = {
   Y = "10001100010101000100001000010000100", Z = "11111000010001000100010001000011111",
   H = "10001100011000111111100011000110001", U = "10001100011000110001100011000101110",
   W = "10001100011000110101101011101110001", B = "11110100011000111110100011000111110",
+  C = "01110100011000010000100001000101110", F = "11111100001000011110100001000010000",
+  J = "00111000100001000010000101001001100", K = "10001100101010011000101001001010001",
+  Q = "01110100011000110001101011001001101", X = "10001100010101000100010101000110001",
+  [":"] = "00000011000110000000011000110000000", ["-"] = "00000000000000011111000000000000000",
+  ["/"] = "00001000010001000100010001000010000", ["("] = "00010001000100001000010000010000010",
+  [")"] = "01000001000001000010000100010001000",
   [" "] = "00000000000000000000000000000000000",
 }
 -- text in the pixel font, cell = px screen px; anchor: "left" (x is its left end) or "right"; (x, cy) in gui units.
@@ -1704,7 +1829,7 @@ local function pixel_text(gbox, str, x, cy, px, anchor, a, r, g, b)
   local top = cy + 3.5 * ch
   local count = 0
   for i = 1, n do
-    local gl = GLYPH[str:sub(i, i)] or GLYPH[" "]
+    local ch_ = str:sub(i, i); local gl = GLYPH[ch_] or GLYPH[ch_:upper()] or GLYPH[" "]
     local gx = x + (i - 1) * 6 * cw
     for row = 0, 6 do
       local col = 0
@@ -1842,7 +1967,7 @@ local function draw()
     local px0, py0, px1, py1 = panel_box()
     if CAL.tab == "settings" then gbox(px0, py0, px1 - px0, py1 - py0, 150, 10, 14, 20)   -- a dark backing
     else
-      local x, y, w, h = tab_rect(1); gbox(x - 6 / SX, y - 48 / SY, 3 * w + 36 / SX, h + 54 / SY, 150, 10, 14, 20)
+      local x, y, w, h = tab_rect(1); gbox(x - 6 / SX, y - 48 / SY, 4 * w + 48 / SX, h + 54 / SY, 150, 10, 14, 20)
       -- v1.4.6: this resolution and whether it has a saved layout (green) or not yet (amber)
       local txt = string.format("%dx%d %s", CAL.sw or 0, CAL.sh or 0, CAL.has_saved and "SAVED LAYOUT" or "NO SAVED LAYOUT")
       CAL.status = txt
@@ -1857,6 +1982,14 @@ local function draw()
     end
     for i = 1, #TABS do button(i, TABS[i].label, CAL.tab == TABS[i].id) end   -- the tab buttons; the active one lit
     button(3, "tab_reset", CAL.armed ~= nil and S.t < CAL.armed)              -- Reset (both tabs), lit while armed
+    button(4, "tab_pick", PICK.lit ~= nil and S.t < PICK.lit)                 -- v1.4.8: Pick (debug), lit as clicked
+    if PICK.text1 then                                                       -- the last pick, large, above the buttons
+      local x, y, w, h = tab_rect(1)
+      local l1, l2 = PICK.text1, PICK.text2 and PICK.text2:upper() or ""
+      gbox(x - 6 / SX, y + h + 6 / SY, 4 * w + 48 / SX, 76 / SY, 190, 10, 14, 20)
+      pixel_text(gbox, l1, x + 6 / SX, y + h + 58 / SY, 4 * kk, "left", 255, 255, 255, 255)
+      pixel_text(gbox, l2, x + 6 / SX, y + h + 24 / SY, 3 * kk, "left", 240, 255, 220, 120)
+    end
     if CAL.tab == "settings" then
     for i = 1, #SL do                                                        -- the sliders: track, fill, knob, tick at 1.0
       local d = SL[i]

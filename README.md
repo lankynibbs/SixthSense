@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.7 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.4.8 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -387,3 +387,13 @@ where the camera looks.
   most recently modified one (or the newest-listed folder). The `viewport:` line names the file and the render size.
 - With render_resolution 2960x832 in a 3840x1080 window (Render Scale below native), the drawable area is the
   top-left 2960x832 and a centred radar sits in its middle. Layouts stay keyed by window size.
+
+## v1.4.8 changes
+
+- **Pick** (debug, mouse only): aim at a unit, open F7, click **Pick** (the fourth button, both tabs). The unit nearest
+  the crosshair (camera 3D forward ray, 12 degree cone, up to 250 m, any unit, tracked or not) is logged as one line:
+  `PICK id <16 hex> name <name|UNKNOWN> class <size>/<kind>/<animated|static>/<enemy> dist <m>m pos (x,y,z) in radar yes|no known-list yes|no time ...`
+  Ctrl+F `PICK id` in sixth_sense.log and copy the id. It also shows large on the F7 page (`PICKED: <id>`, name and
+  distance) until the next pick, and the unit's radar dot gets a blinking white ring for 2 s.
+- `picked_ids=id:count,...` in the ini (and a `picked ids:` log line) builds up a list of what was picked, so an unknown
+  Illuminate sentry picked a few times stands out; add its id to `static_ids`.

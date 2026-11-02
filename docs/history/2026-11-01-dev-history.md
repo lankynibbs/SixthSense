@@ -64,3 +64,7 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 - Darryl approved v1.4.6 layouts. His log showed the settings file not found in the redirected AppData; HellForge's real one is `<HellForge>\userdata\profiles\default\user_settings.config` (screen 3840x1080, render 2960x832, Render Scale index 3). The C:\ AppData file (5120x1440 borderless) is not the one HellForge uses. v1.4.7 searches the profiles folder and picks the profile matching the window.
 - Layouts stay keyed by window size, not render scale: fractions of the drawable area already absorb a render-scale change, and Darryl approved per-resolution keys.
 - Gui.resolution returned "596 1": not understood (not a size); logged only.
+
+## Pick debug control (v1.4.8, 2026-11-02)
+- Darryl declined an automatic discovery mode and asked for a control to mark a unit he sees and print its id. Pick scores every live unit (World.units, runtime-built skipped) by angle off the camera's 3D forward ray within 12 degrees and 250 m, with a small bonus for known/listed/animated units over props; fallbacks: 2D view direction (20 degrees), then nearest unit.
+- Per Darryl: the id is the first field (`PICK id <hex>`) for Ctrl+F and copy, and it stays on screen (`PICKED: <id>`) until the next pick.

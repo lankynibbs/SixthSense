@@ -6,6 +6,10 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-11-02
+### Added
+- Pick debug button on the F7 page (mouse only): the unit nearest the crosshair is logged as `PICK id <hex> name ... class ... dist ...`, shown large on the F7 page until the next pick, and ringed on the radar for 2 s; `picked_ids=id:count` in the ini. (Automatic discovery mode declined by Darryl.)
+
 ## [1.4.7] - 2026-11-02
 ### Confirmed
 - v1.4.6 per-resolution layouts approved in game by Darryl (3840x1080 <-> 1920x1080): saved resolutions restore, unsaved start centred.
