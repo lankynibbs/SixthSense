@@ -7,7 +7,7 @@ HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE.parent / 'BingusSharedLoader/scripts'))
 from archive import resource_hash
 FONT = HERE.parent / 'Treasure-Radar/src/fonts/Poppins-Bold.ttf'
-LABELS = [('tab_display', 'Display'), ('tab_settings', 'Settings'), ('tab_reset', 'Reset'), ('size', 'Size'), ('sensitivity', 'Sensitivity'), ('repeat_rate', 'Repeat rate'), ('dot_size', 'Dot size'), ('radar_color', 'Radar color'), ('visibility', 'Visibility'), ('vis_shown', 'Shown'), ('vis_hidden', 'Hidden')]
+LABELS = [('tab_display', 'Display'), ('tab_settings', 'Settings'), ('tab_reset', 'Reset'), ('size', 'Size'), ('sensitivity', 'Sensitivity'), ('repeat_rate', 'Repeat rate'), ('dot_size', 'Dot size'), ('radar_color', 'Radar color'), ('controls', 'Controls'), ('ctl_kbm', 'KB + Mouse'), ('ctl_pad', 'Controller'), ('visibility', 'Visibility'), ('vis_shown', 'Shown'), ('vis_hidden', 'Hidden')]
 H = 48                                   # texture height; text cap about 30 px
 
 def label(text):

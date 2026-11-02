@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.5.3 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.5.4 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.5.3"
+local MOD, VERSION = "sixth_sense", "1.5.4"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -83,7 +83,7 @@ local function say(s)
 end
 
 -- ---------------------------------------------------------------- config
-local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_color = "green", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, v145_migrated = false, v146_migrated = false, radar_layouts = "", visibility = "shown", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
+local CFG = { range = 40, opacity = 0.85, position = "bottom", sx_scale = 1.2, sy_scale = 0.9333, gy_top = 1080, calibrate = true, toggle_key = "f7", cursor_flip_y = false, area_x0 = 0, area_y0 = 0, area_x1 = 0, area_y1 = 0, area_scale = 1, bars_fx = 0.5, bars_fy = 0.85, bar_debug = false, v110_migrated = false, sensitivity = 1.0, repeat_rate = 1.0, radar_size = 0.35, radar_fx = 0.5, radar_fy = 0.78, radar_style = "auto", dot_size = "medium", radar_color = "green", control = "keyboard_mouse", radar_aspect = 1.25, v132_migrated = false, ignore_ids = "", still_hide = 1.0, static_ids = "", static_log = true, panel_fx = 0.03, panel_fy = 0.08, radar_cx = -1, radar_cy = -1, radar_d = -1, v142_migrated = false, v144_migrated = false, v145_migrated = false, v146_migrated = false, radar_layouts = "", visibility = "shown", transform_scale = "height", transform_ref_h = 1080, tex_size_px = true, label_style = "auto", layer = 950,  size = 1.0, swap_sides = false,
               detect = "both", discovery = true, discovery_static = false, discovery_range = 80, candidate_weight = 1.5,
               debug = false }
 local CFG_TEXT = [[
@@ -148,6 +148,11 @@ v144_migrated=true
 ; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
 ; Enemy dots and enemy structures (diamonds) stay red in every colour.
 radar_color=green
+; control (v1.5.4): keyboard_mouse (default: F7 and the mouse) or controller (a game pad: hold View / Back /
+; touchpad 2 s to open or close the F7 page; D-pad, face buttons and bumpers on it; see CONTROLS.md). In controller
+; mode the F7 key and the mouse do nothing while a pad is connected (with no pad found they still work, so you are
+; never locked out). "Controls" buttons on the F7 page's Settings tab.
+control=keyboard_mouse
 ; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
 ; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
 ; hud and always became shown once.)
@@ -209,6 +214,10 @@ local LAYOUTS_COMMENT = [[; radar_layouts (v1.4.6): the radar's place saved per 
 ; user_settings.config (APPDATA, LOCALAPPDATA, then HellForge's userdata\profiles\*; render_resolution) anchored
 ; top-left, cut at the bottom where the game clips the gui (see the "viewport:" lines in sixth_sense.log). Going back
 ; to a resolution restores its layout; one with none saved starts centred in the drawable area at the default size. Reset (two clicks, or F7 held 3 s) clears only the current resolution's entry. Written by calibration.]]
+local CONTROL_COMMENT = [[; control (v1.5.4): keyboard_mouse (default: F7 and the mouse) or controller (a game pad: hold View / Back /
+; touchpad 2 s to open or close the F7 page; D-pad, face buttons and bumpers on it; see CONTROLS.md). In controller
+; mode the F7 key and the mouse do nothing while a pad is connected (with no pad found they still work, so you are
+; never locked out). "Controls" buttons on the F7 page's Settings tab.]]
 local COLOR_COMMENT = [[; radar_color (v1.5.1): the radar display's colour (disc, rings, cross hairs; v1.5.2: not the enemy markers): green (default), white, yellow,
 ; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
 ; Enemy dots and enemy structures (diamonds) stay red in every colour.]]
@@ -266,6 +275,7 @@ do
   CFG.radar_fx = clamp(CFG.radar_fx, 0, 1); CFG.radar_fy = clamp(CFG.radar_fy, 0, 1)
   CFG.radar_style = tostring(CFG.radar_style):lower(); if CFG.radar_style ~= "texture" and CFG.radar_style ~= "dots" then CFG.radar_style = "auto" end
   CFG.visibility = tostring(CFG.visibility):lower(); if CFG.visibility ~= "hidden" and CFG.visibility ~= "hud" then CFG.visibility = "shown" end   -- (hud: migrated below)
+  CFG.control = tostring(CFG.control):lower(); if CFG.control ~= "controller" then CFG.control = "keyboard_mouse" end
   CFG.radar_color = tostring(CFG.radar_color):lower():gsub("[%s-]+", "_"); if not COLOR_IDX[CFG.radar_color] then CFG.radar_color = "green" end
   CFG.dot_size = tostring(CFG.dot_size):lower(); if CFG.dot_size ~= "small" and CFG.dot_size ~= "large" then CFG.dot_size = "medium" end
   if CFG.sx_scale <= 0 then CFG.sx_scale = 1.2 end; if CFG.sy_scale <= 0 then CFG.sy_scale = 0.9333 end
@@ -904,6 +914,67 @@ local function krep(n)
   else IN.rep[n] = nil end
   return false
 end
+-- ---------------------------------------------------------------- v1.5.4: controller (control=controller)
+-- The engine's own pads (Pad1..Pad8; the first active / connected one), its buttons found by the names the pad
+-- lists itself (num_buttons, button_name), as Chef Shared Loader's options menu does on this game. Only read in
+-- controller mode. The game still sees every button (Lua cannot take input from it), so the page opens on a long
+-- hold of View / Back / touchpad (the button the game leaves free off a mission) and the rest is read only while
+-- the page is open.
+local PAD = { n = nil, ix = {}, look_at = 0, down = {}, pr = {}, since = {}, rep = {}, name = nil }
+_G.SIXTH_SENSE_PAD = PAD                           -- (read by the stub test)
+local PAD_NAMES = { up = { "d_up", "up", "dpad_up" }, down = { "d_down", "down", "dpad_down" },
+  left = { "d_left", "left", "dpad_left" }, right = { "d_right", "right", "dpad_right" },
+  a = { "a", "cross" }, b = { "b", "circle" }, x = { "x", "square" }, y = { "y", "triangle" },
+  lb = { "left_shoulder", "l1", "lb" }, rb = { "right_shoulder", "r1", "rb" },
+  view = { "touch", "touchpad", "back", "view", "select", "share" } }
+local function pad_find()
+  if S.t < PAD.look_at then return end
+  PAD.look_at = S.t + 2
+  for n = 1, 8 do
+    local p = "Pad" .. n
+    if truthy(call(p, "active")) or truthy(call(p, "connected")) then
+      local cnt, by = call(p, "num_buttons"), {}
+      if type(cnt) == "number" and cnt > 0 and cnt <= 64 then
+        for i = 0, cnt - 1 do local nm = call(p, "button_name", i); if type(nm) == "string" and nm ~= "" then by[nm:lower()] = i end end
+      end
+      local ix, miss = {}, {}
+      for k, names in pairs(PAD_NAMES) do
+        for _, c in ipairs(names) do if by[c] then ix[k] = by[c]; break end end
+        if not ix[k] then miss[#miss + 1] = k end
+      end
+      if ix.view and ix.a and ix.up then
+        PAD.n, PAD.ix, PAD.down, PAD.since, PAD.p = n, ix, {}, {}, p
+        PAD.name = tostring(call(p, "name"))
+        table.sort(miss)
+        say(string.format("controller: %s (%s)%s", p, PAD.name, #miss > 0 and ("; no button for " .. table.concat(miss, ", ")) or ""))
+        return
+      end
+    end
+  end
+end
+-- this frame's buttons: PAD.pr[k] pressed this frame, PAD.since[k] held since
+local function pad_frame()
+  PAD.pr = {}
+  if not PAD.n then pad_find(); if not PAD.n then return end end
+  if not (truthy(call(PAD.p, "active")) or truthy(call(PAD.p, "connected"))) then
+    say("controller: " .. PAD.p .. " gone"); PAD.n, PAD.look_at = nil, 0; return
+  end
+  for k, i in pairs(PAD.ix) do
+    local d = truthy(call(PAD.p, "button", i))
+    if d and not PAD.down[k] then PAD.pr[k] = true; PAD.since[k] = S.t end
+    if not d then PAD.since[k] = nil end
+    PAD.down[k] = d
+  end
+end
+-- controller mode with a pad found: the pad drives the page and the F7 key / mouse do nothing
+local function use_pad() return CFG.control == "controller" and PAD.n ~= nil end
+local function prep(k)
+  if PAD.pr[k] then PAD.rep[k] = S.t + 0.35; return true end
+  if PAD.rep[k] and PAD.down[k] then
+    if S.t >= PAD.rep[k] then PAD.rep[k] = S.t + 0.05; return true end
+  else PAD.rep[k] = nil end
+  return false
+end
 local function xy(v)
   if v == nil then return nil end
   local x, y = call("Vector3", "to_elements", v)
@@ -1351,10 +1422,10 @@ local function cal_save(why, sw, sh)
   if CAL.pos_set and CAL.key then LAYOUTS[CAL.key] = { CAL.cx, CAL.cy, CAL.d }; CAL.has_saved = true end   -- (moved or resized here)
   CFG.radar_layouts = layouts_str()
   local kv = { calibrate = tostring(CAL.on), toggle_key = KEYNAMES.toggle[1], radar_layouts = CFG.radar_layouts, panel_fx = string.format("%.2f", CFG.panel_fx), panel_fy = string.format("%.2f", CFG.panel_fy),
-               sensitivity = string.format("%.2f", CFG.sensitivity), repeat_rate = string.format("%.2f", CFG.repeat_rate), dot_size = CFG.dot_size, radar_color = CFG.radar_color, visibility = CFG.visibility,
-               __order = { "calibrate", "toggle_key", "radar_layouts", "panel_fx", "panel_fy", "sensitivity", "repeat_rate", "dot_size", "radar_color", "visibility" },
-               __comment = { radar_color = COLOR_COMMENT, visibility = VIS_COMMENT, radar_layouts = LAYOUTS_COMMENT } }
-  say("settings " .. why .. ": dot_size " .. CFG.dot_size .. ", radar_color " .. CFG.radar_color .. ", visibility " .. CFG.visibility)
+               sensitivity = string.format("%.2f", CFG.sensitivity), repeat_rate = string.format("%.2f", CFG.repeat_rate), dot_size = CFG.dot_size, radar_color = CFG.radar_color, control = CFG.control, visibility = CFG.visibility,
+               __order = { "calibrate", "toggle_key", "radar_layouts", "panel_fx", "panel_fy", "sensitivity", "repeat_rate", "dot_size", "radar_color", "control", "visibility" },
+               __comment = { control = CONTROL_COMMENT, radar_color = COLOR_COMMENT, visibility = VIS_COMMENT, radar_layouts = LAYOUTS_COMMENT } }
+  say("settings " .. why .. ": dot_size " .. CFG.dot_size .. ", radar_color " .. CFG.radar_color .. ", control " .. CFG.control .. ", visibility " .. CFG.visibility)
   say(string.format("settings %s: sensitivity %.2f (range %.0f m, gain x%.2f), repeat_rate %.2f (re-acquire %.2f s, hold %.2f s, fade %.2f s)",
     why, CFG.sensitivity, clamp(CFG.range * CFG.sensitivity, 10, 120), CFG.sensitivity, CFG.repeat_rate,
     0.5 / CFG.repeat_rate, 1.0 / CFG.repeat_rate, 1.5 / CFG.repeat_rate))
@@ -1386,7 +1457,7 @@ local function slider_rect(i)
   local top = vtop - (CAL.pfy or CFG.panel_fy) * CAL.bh - 80 / CFG.sy_scale     -- (below the tab buttons)
   -- (the whole stack and its values kept on the visible screen)
   tx = clamp(tx, 150 / CFG.sx_scale, vw - w - 140 / CFG.sx_scale)
-  top = clamp(top, math.max(vbot, 0) + h + #SL * sp + 40 / CFG.sy_scale, vtop - 20 / CFG.sy_scale)
+  top = clamp(top, math.max(vbot, 0) + h + #SL * sp + 102 / CFG.sy_scale, vtop - 20 / CFG.sy_scale)
   return tx, top - h - (i - 1) * sp, w, h
 end
 -- v1.4.5: the Shown / Hidden buttons (radio style, the chosen one lit), one row under the last slider, 200 x 48 px
@@ -1396,6 +1467,13 @@ local function vis_rect(i)
   local w, h = 200 / CFG.sx_scale, 48 / CFG.sy_scale
   return tx + (i - 1) * (w + 12 / CFG.sx_scale), ty - 50 / CFG.sy_scale - h / 2 + 8 / CFG.sy_scale, w, h
 end
+-- v1.5.4: the Controls buttons (keyboard / mouse, controller), one row under Shown / Hidden
+local CTL_BTN = { { id = "keyboard_mouse", label = "ctl_kbm" }, { id = "controller", label = "ctl_pad" } }
+local function ctl_rect(i)
+  local x, y, w, h = vis_rect(i)
+  return x, y - 62 / CFG.sy_scale, w, h
+end
+_G.SIXTH_SENSE_CTL = ctl_rect
 _G.SIXTH_SENSE_VIS = vis_rect                     -- (read by the stub test)
 _G.SIXTH_SENSE_SLIDER = slider_rect               -- (read by the stub test)
 local function knob_x(tx, tw, i)
@@ -1427,6 +1505,8 @@ local function panel_box()
   end
   for i = 1, #VIS_BTN do
     local x, y, w, h = vis_rect(i)
+    x0 = math.min(x0, x - 150 / CFG.sx_scale); x1 = math.max(x1, x + w); y0 = math.min(y0, y - 12 / CFG.sy_scale)
+    x, y, w, h = ctl_rect(i)
     x0 = math.min(x0, x - 150 / CFG.sx_scale); x1 = math.max(x1, x + w); y0 = math.min(y0, y - 12 / CFG.sy_scale)
   end
   return x0, y0, x1, y1
@@ -1469,7 +1549,7 @@ local function reset_click(sw, sh)
   if CAL.armed and S.t < CAL.armed then
     CAL.armed = nil
     if CAL.tab == "settings" then
-      CFG.sensitivity, CFG.repeat_rate, CFG.dot_size, CFG.radar_color, CFG.visibility = 1.0, 1.0, "medium", "green", "shown"; set_scale(D_DEF)
+      CFG.sensitivity, CFG.repeat_rate, CFG.dot_size, CFG.radar_color, CFG.visibility = 1.0, 1.0, "medium", "green", "shown"; set_scale(D_DEF)   -- (control is kept)
       say("reset (Settings, confirmed): size, sensitivity, repeat_rate, dot_size, radar_color and visibility back to their defaults")
     else reset_pos("Display, confirmed") end
     cal_save("reset", sw, sh); panel_place("reset")
@@ -1479,6 +1559,61 @@ local function reset_click(sw, sh)
   end
 end
 -- one frame of calibration input (mx, my: the cursor in gui units)
+-- v1.5.4: one frame of the F7 page on the controller (the page open; see CONTROLS.md)
+-- LB / RB: Display / Settings tab. X: Reset (twice within 3 s). B: close the page (saved).
+-- Display: D-pad moves the radar (hold: repeats, faster after 1 s); Y bigger, A smaller (hold repeats).
+-- Settings: D-pad up / down picks a row (the sliders, Visibility, Controls), left / right changes it.
+local function pad_input(sw, sh)
+  if CAL.armed and S.t >= CAL.armed then CAL.armed = nil end
+  if PAD.pr.b then
+    CAL.on, CAL.armed, CAL.drag = false, nil, nil
+    cal_save("calibration off (controller B)", sw, sh); return
+  end
+  if PAD.pr.lb or PAD.pr.rb then
+    CAL.armed = nil; CAL.tab = (CAL.tab == "settings") and "display" or "settings"; CAL.sel = CAL.sel or 1
+    say("calibration tab: " .. CAL.tab .. " (controller)")
+  end
+  if PAD.pr.x then reset_click(sw, sh); return end
+  if CAL.tab ~= "settings" then
+    local moved = false
+    for _, k in ipairs({ "left", "right", "up", "down" }) do
+      if prep(k) then
+        local st = (PAD.since[k] and S.t - PAD.since[k] > 1) and 20 or 4
+        local dx = (k == "left" and -st) or (k == "right" and st) or 0
+        local dy = (k == "up" and st) or (k == "down" and -st) or 0
+        move_by(dx / CFG.sx_scale, dy / CFG.sy_scale); moved = true
+      end
+    end
+    if prep("y") then set_scale(cal_scale() * 1.03); moved = true end
+    if prep("a") then set_scale(cal_scale() / 1.03); moved = true end
+    if moved then CAL.pad_moved = S.t end
+    if CAL.pad_moved and S.t - CAL.pad_moved > 0.5 then       -- (let go: dropped, as with the mouse)
+      CAL.pad_moved = nil; panel_place("radar dropped (controller)"); cal_save("dropped (controller)", sw, sh)
+    end
+    return
+  end
+  local rows = #SL + 2
+  CAL.sel = clamp(CAL.sel or 1, 1, rows)
+  if prep("up") then CAL.sel = (CAL.sel - 2) % rows + 1 end
+  if prep("down") then CAL.sel = CAL.sel % rows + 1 end
+  local dir = (prep("left") and -1 or 0) + (prep("right") and 1 or 0)
+  if dir ~= 0 then
+    local i = CAL.sel
+    if i <= #SL then
+      local d = SL[i]
+      local snap = d.name == "dot_size" or d.name == "radar_color"
+      local stp = snap and 1 or (d.max - d.min) / 40
+      d.set(clamp(d.get() + dir * stp, d.min, d.max)); CAL.dirty = true
+      if i == 1 then panel_place("size changed (controller)") end
+    elseif i == #SL + 1 then
+      local v = dir < 0 and "shown" or "hidden"
+      if CFG.visibility ~= v then CFG.visibility = v; CAL.dirty = true; say("visibility: " .. v .. " (controller)") end
+    else
+      local v = dir < 0 and "keyboard_mouse" or "controller"
+      if CFG.control ~= v then CFG.control = v; CAL.dirty = true; say("control: " .. v .. " (controller)") end
+    end
+  end
+end
 local function cal_input(sw, sh, gx, gy)
   local sh_ = kdown("shift")
   local step = (sh_ and 20 or 2)
@@ -1512,6 +1647,14 @@ local function cal_input(sw, sh, gx, gy)
       if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
         CAL.drag = "tab"
         if CFG.visibility ~= VIS_BTN[i].id then CFG.visibility = VIS_BTN[i].id; CAL.dirty = true; say("visibility: " .. CFG.visibility) end
+        break
+      end
+    end
+    for i = 1, (CAL.drag or disp) and 0 or #CTL_BTN do          -- v1.5.4: Controls (keyboard / mouse or controller)
+      local x, y, w, h = ctl_rect(i)
+      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
+        CAL.drag = "tab"
+        if CFG.control ~= CTL_BTN[i].id then CFG.control = CTL_BTN[i].id; CAL.dirty = true; say("control: " .. CFG.control .. " (mouse)") end
         break
       end
     end
@@ -1697,11 +1840,14 @@ local LABEL_TEX = {
   repeat_rate = { 'ae02fd6005683294', 196, 48 },
   dot_size = { '8024c7d02d7bd868', 136, 48 },
   radar_color = { '05ff3e115296cc83', 196, 48 },
+  controls = { '8e35a2efcf759a3e', 148, 48 },
+  ctl_kbm = { 'e034b5447cc4edd1', 192, 48 },
+  ctl_pad = { 'c13ff984012bfdeb', 172, 48 },
   visibility = { '9f6f6ca838a05cdf', 152, 48 },
   vis_shown = { 'ebe63964e4089a54', 120, 48 },
   vis_hidden = { '5d673ce754dcc40d', 128, 48 },
 }
-local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", radar_color = "RADAR COLOR", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
+local LABEL_WORD = { tab_reset = "RESET", tab_display = "DISPLAY", tab_settings = "SETTINGS", size = "SIZE", sensitivity = "SENSITIVITY", repeat_rate = "REPEAT RATE", dot_size = "DOT SIZE", radar_color = "RADAR COLOR", controls = "CONTROLS", ctl_kbm = "MOUSE", ctl_pad = "PAD", visibility = "VISIBILITY", vis_shown = "SHOWN", vis_hidden = "HIDDEN" }
 local GLYPH = {
   ["0"] = "01110100011001110101110011000101110", ["1"] = "00100011000010000100001000010001110",
   ["2"] = "01110100010000100010001000100011111", ["3"] = "11110000010000101110000010000111110",
@@ -1820,14 +1966,31 @@ local function draw()
     end
   end
   -- toggle_key (f7): calibration on/off (saved both ways)
-  if kpressed("toggle") then
+  if CFG.control == "controller" then pad_frame() end
+  local kbm = not use_pad()                          -- (v1.5.4: the F7 key and the mouse, unless a pad drives the page)
+  if use_pad() then                                  -- View / Back / touchpad held 2 s: the page on / off; 5 s: layout reset
+    local hv = PAD.since.view and S.t - PAD.since.view
+    if not hv then CAL.pv_done, CAL.pv_reset = nil, nil end
+    if hv and hv >= 2 and not CAL.pv_done then
+      CAL.pv_done = true; CAL.on = not CAL.on; CAL.armed, CAL.drag = nil, nil
+      if CAL.on then CAL.tab = "display"; panel_place("opened (controller)") end
+      cal_save(CAL.on and "calibration on (controller View held 2 s)" or "calibration off (controller View held 2 s)", sw, sh)
+    end
+    if hv and hv >= 5 and not CAL.pv_reset then
+      CAL.pv_reset = true
+      CFG.panel_fx, CFG.panel_fy = 0.03, 0.08
+      reset_pos("controller View held 5 s"); CAL.on, CAL.tab, CAL.drag = true, "display", nil
+      panel_place("controller View held 5 s"); cal_save("layout reset (controller View held 5 s)", sw, sh)
+    end
+  end
+  if kbm and kpressed("toggle") then
     CAL.on = not CAL.on
     CAL.armed = nil
     if not CAL.on then hold_give(); CAL.drag = nil else CAL.tab = "display"; panel_place("opened") end   -- (F7 opens on Display)
     cal_save((CAL.on and "calibration on (" or "calibration off (") .. KEYNAMES.toggle[1] .. ")", sw, sh)
   end
   -- panic recovery: F7 held 3 s resets the layout (radar and panel), calibration left on
-  if kdown("toggle") then
+  if kbm and kdown("toggle") then
     CAL.f7_t = CAL.f7_t or S.t
     if not CAL.f7_done and S.t - CAL.f7_t >= 3 then
       CAL.f7_done = true
@@ -1838,7 +2001,11 @@ local function draw()
   else CAL.f7_t, CAL.f7_done = nil, nil end
   local function gbox(x, y, w, h, a, r, g, b) box(x, y, w, h, a, r, g, b) end
   local gx, gy
-  if CAL.on then
+  if CAL.on and not kbm then
+    if IN.hold then hold_give() end
+    pad_input(sw, sh)
+    if CAL.dirty and S.t - CAL.last_save >= 0.5 then cal_save("changed", sw, sh) end
+  elseif CAL.on then
     read_mouse(sw, sh)
     if IN.mx then gx, gy = IN.mx / SX, GT - IN.my / SY end
     cal_input(sw, sh, gx, gy)
@@ -1921,6 +2088,31 @@ local function draw()
         local lb = VIS_BTN[i].label
         draw_label(gbox, lb, x + w / 2 + (LABEL_TEX[lb][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
       end
+    end
+    do                                                                       -- v1.5.4: Controls buttons
+      local x1_, y1_, w1_, h1_ = ctl_rect(1)
+      draw_label(gbox, "controls", x1_ - 16 / SX, y1_ + h1_ / 2, kk)
+      for i = 1, #CTL_BTN do
+        local x, y, w, h = ctl_rect(i)
+        local on = CFG.control == CTL_BTN[i].id
+        gbox(x, y, w, h, on and 235 or 150, on and 0 or 40, on and 150 or 40, on and 200 or 50)
+        if on then gbox(x, y, w, 4 / SY, 255, 255, 255, 255) end
+        local lb = CTL_BTN[i].label
+        draw_label(gbox, lb, x + w / 2 + (LABEL_TEX[lb][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
+      end
+    end
+    if not kbm then                                                          -- v1.5.4: the controller's row, framed yellow
+      local i, x, y, w, h = CAL.sel or 1
+      if i <= #SL then x, y, w, h = slider_rect(i); x, y, w, h = x - 20 / SX, y - 16 / SY, w + 40 / SX, h + 32 / SY
+      else
+        local f = (i == #SL + 1) and vis_rect or ctl_rect
+        local xa, ya, wa, ha = f(1); local xb, _, wb = f(2)
+        x, y, w, h = xa - 6 / SX, ya - 6 / SY, xb + wb - xa + 12 / SX, ha + 12 / SY
+      end
+      local t1, t2 = 3 / SX, 3 / SY
+      gbox(x, y, w, t2, 255, 255, 230, 0); gbox(x, y + h - t2, w, t2, 255, 255, 230, 0)
+      gbox(x, y, t1, h, 255, 255, 230, 0); gbox(x + w - t1, y, t1, h, 255, 255, 230, 0)
+      CAL.sel_drawn = (CAL.sel_drawn or 0) + 1
     end
     end
     LAYER_NOW = 950

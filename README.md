@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.5.3 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.5.4 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -436,3 +436,14 @@ where the camera looks.
 - **Enemy structures are red**, the same red as enemy dots (255,40,40); the orange is gone (Darryl had not asked for
   it). They keep their diamond shape, so turrets still read apart from the square enemy dots. `radar_color` still
   tints only the disc, rings and cross hairs.
+
+## v1.5.4 changes
+
+- **Controller option**: `control=keyboard_mouse` (default) or `controller`, picked with the **Controls** buttons
+  (KB + Mouse / Controller) on the F7 page's Settings tab, or the Controls row on the pad. In controller mode the
+  pad drives the page: hold **View / Back / touchpad 2 s** to open or close it (5 s: layout reset), **LB / RB** tabs,
+  **X** Reset (twice), **B** close; Display: **D-pad** moves, **Y / A** bigger / smaller; Settings: D-pad up / down
+  picks a row (framed yellow), left / right changes it. While a pad drives the page, the F7 key and the mouse do
+  nothing; in keyboard / mouse mode the pad is not read at all. With no pad connected, controller mode falls back to
+  F7 and the mouse. Pads are found as Chef Shared Loader does on this game (Pad1..Pad8, buttons by the names the pad
+  lists). Not yet tested in game. Full map: [CONTROLS.md](CONTROLS.md).

@@ -534,7 +534,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.5.3 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.5.4 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -806,6 +806,73 @@ rt_ = radar_rt(TEXC); ut_ = rt_.eval('update')
 for _ in range(220): ut_(0.016)
 tints = set(k for k, v in rt_.globals().TINTS.items())
 check(rt_.globals().SIXTH_SENSE_RADAR.style == 'texture' and '110,200,255' in tints, 'texture disc tinted light_blue (%s)' % sorted(tints))
+# ---------------------------------------------------------------- v1.5.4: control scheme (keyboard / mouse or controller)
+PADX = '''
+PADON, PADB = true, {}
+local NM = {"a", "b", "x", "y", "d_up", "d_down", "d_left", "d_right", "left_shoulder", "right_shoulder", "back", "start"}
+Pad1 = {active = function() return PADON end, num_buttons = function() return #NM end, button_name = function(i) return NM[i + 1] end,
+  button = function(i) return PADB[NM[i + 1]] and 1 or 0 end, name = function() return "Test Pad" end}'''
+open(INI, 'w').write(BASE146.replace('calibrate=false', 'calibrate=true') + 'v146_migrated=true\nradar_layouts=\n')
+rq = radar_rt(PADX); uq = rq.eval('update'); gq = rq.globals(); CQ = gq.HUD_CFG; KQ = gq.SIXTH_SENSE_CAL; PQ = gq.SIXTH_SENSE_PAD
+def runq(sec):
+    for _ in range(max(1, int(sec / 0.016))): uq(0.016)
+def pad(name, hold=0.05): gq.PADB[name] = True; runq(hold); gq.PADB[name] = False; runq(0.05)
+def f7(): rq.execute('PRESSED[1] = true'); uq(0.016); rq.execute('PRESSED = {}'); runq(0.05)
+def qtab(): return rq.eval('SIXTH_SENSE_TAB()')
+def ival(k): return dict(re.findall(r'^(\w+)=(.*)$', open(INI).read(), re.M)).get(k)
+runq(3.5)
+check(CQ.control == 'keyboard_mouse', 'default control is keyboard_mouse')
+# keyboard / mouse mode: the pad is never read, its buttons do nothing
+on0, t0 = KQ.on, qtab()
+pad('back', 2.5); pad('right_shoulder'); pad('b')
+check(KQ.on == on0 and qtab() == t0 and PQ.n is None, 'keyboard / mouse mode: View held 2.5 s, RB and B do nothing; the pad is not read')
+f7(); check(KQ.on != on0, 'keyboard / mouse mode: F7 toggles the page'); f7(); check(KQ.on == on0, 'F7 again')
+# pick Controller with the mouse (Settings tab)
+click_tab(rq, 2); runq(0.2)
+x, y, w, h = rq.eval('function(i) return SIXTH_SENSE_CTL(i) end')(2)
+gq.MX, gq.MY = to_window(x + w / 2, y + h / 2); uq(0.016); gq.LMB = 1; uq(0.016); gq.LMB = 0; runq(1.2)
+check(CQ.control == 'controller' and ival('control') == 'controller' and '; control (v1.5.4)' in open(INI).read(), 'Controls: the Controller button (mouse) sets control=controller, saved with its comment')
+runq(2.5)
+check(PQ.n == 1 and PQ.name == 'Test Pad', 'controller mode: Pad1 found by its button names')
+# controller mode: keys and the mouse do nothing
+on0, t0 = KQ.on, qtab(); cx0 = KQ.cx
+f7(); check(KQ.on == on0, 'controller mode: F7 does not toggle the page')
+click_tab(rq, 1); check(qtab() == t0, 'controller mode: a mouse click on a tab does nothing')
+rq.execute('HELD[1] = true'); runq(3.5); rq.execute('HELD = {}'); runq(0.05)
+check('F7 held 3 s' not in open(LOGDIR + '/sixth_sense.log').read(), 'controller mode: F7 held 3 s does not reset')
+# the pad drives the page
+pad('b'); check(not KQ.on, 'B closes the page')
+pad('back', 2.3); check(KQ.on and qtab() == 'display', 'View held 2 s opens the page on Display')
+cx0, d0 = KQ.cx, KQ.d
+for k in range(2, 6): rq.execute('PRESSED[%d] = true' % k); runq(0.02); rq.execute('PRESSED = {}'); runq(0.02)
+check(KQ.cx == cx0 and KQ.d == d0, 'controller mode: arrow keys do not move the radar')
+pad('d_right'); check(KQ.cx > cx0, 'D-pad right moves the radar right (%.4f -> %.4f)' % (cx0, KQ.cx))
+pad('y'); check(KQ.d > d0, 'Y makes it bigger (%.3f -> %.3f)' % (d0, KQ.d))
+runq(1.2); check('dropped (controller)' in open(LOGDIR + '/sixth_sense.log').read(), 'let go: saved like a mouse drop')
+pad('right_shoulder'); check(qtab() == 'settings', 'RB: Settings tab')
+pad('d_down', 0.05); pad('d_down', 0.05); pad('d_down', 0.05)   # row 4: dot size
+ds0 = CQ.dot_size; pad('d_right'); check(KQ.sel == 4 and CQ.dot_size != ds0, 'D-pad picks the Dot size row, right changes it (%s -> %s)' % (ds0, CQ.dot_size))
+pad('d_down'); pad('d_right'); check(CQ.radar_color == 'white', 'Radar color row: right -> white')
+pad('d_down'); pad('d_right'); check(CQ.visibility == 'hidden', 'Visibility row: right -> Hidden'); pad('d_left'); check(CQ.visibility == 'shown', 'left -> Shown')
+runq(0.3); check(gq.SIXTH_SENSE_CAL.sel_drawn and gq.SIXTH_SENSE_CAL.sel_drawn > 0, 'the selected row is framed')
+pad('x'); pad('x'); runq(0.5)
+check(CQ.radar_color == 'green' and CQ.dot_size == 'medium' and CQ.control == 'controller', 'X twice: Settings reset (green, medium); control kept')
+# restart keeps controller
+rq2 = runtime(); rq2.execute('local function find(fn, name) for i = 1, 200 do local n, v = debug.getupvalue(fn, i); if not n then return end if n == name then return v end end end\nHUD_CFG = find(find(update, "step"), "CFG")')
+check(rq2.globals().HUD_CFG.control == 'controller', 'restart loads control=controller')
+# View held 5 s: layout reset
+pad('back', 5.3); check('layout reset (controller View held 5 s)' in open(LOGDIR + '/sixth_sense.log').read() and KQ.on, 'View held 5 s resets the layout, page open')
+# no pad: keyboard / mouse still work (never locked out)
+gq.PADON = False; runq(0.3)
+on0 = KQ.on; f7(); check(PQ.n is None and KQ.on != on0, 'controller mode with no pad connected: F7 still works')
+gq.PADON = True; runq(2.5)
+# back to keyboard / mouse from the pad (Controls row, left)
+if not KQ.on: pad('back', 2.3)
+if qtab() != 'settings': pad('right_shoulder')
+for _ in range(8): pad('d_down')
+KQ.sel = 7; pad('d_left'); runq(1.2)
+check(CQ.control == 'keyboard_mouse' and ival('control') == 'keyboard_mouse', 'Controls row on the pad: left -> keyboard_mouse, saved')
+on0 = KQ.on; pad('b'); check(KQ.on == on0, 'back in keyboard / mouse mode: B does nothing')
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)

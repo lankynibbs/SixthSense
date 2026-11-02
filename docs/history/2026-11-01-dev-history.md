@@ -83,3 +83,6 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 
 ## Red structure diamonds (v1.5.3, 2026-11-02)
 - Darryl had not asked for orange turret diamonds (orange dated from v1.4.0). v1.5.3 draws them in the enemy dots' red (255,40,40), keeping the diamond shape so structures stay distinguishable from units.
+
+## Controller option (v1.5.4, 2026-11-02)
+- Darryl asked for a controller option: either keyboard / mouse or controller. Added `control=keyboard_mouse|controller` (Controls buttons on Settings). Pad discovery follows Chef Shared Loader 1.3.1's options menu on this game: Pad1..Pad8 (active / connected), buttons by the names the pad lists (num_buttons / button_name), d_up / a / b / x / y / left_shoulder / right_shoulder / back (or touch). The game still sees every button, so the page opens on a 2 s hold of View / Back / touchpad (Chef: the button the game leaves free off a mission) and the rest is read only while it is open. Each scheme ignores the other's input; controller mode without a pad falls back to F7 and the mouse so nobody is locked out. CONTROLS.md was written on request (v1.5.3) and regenerated for this change.

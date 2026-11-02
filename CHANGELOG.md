@@ -6,6 +6,11 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.5.4] - 2026-11-02
+### Added
+- Control scheme: `control=keyboard_mouse` (default) or `controller`, with Controls buttons on the F7 Settings tab and in the ini. Controller: View / Back / touchpad held 2 s opens / closes the page (5 s: layout reset), LB / RB tabs, X Reset, B close, D-pad move, Y / A resize, D-pad rows and values on Settings. Each scheme ignores the other's input; controller mode with no pad falls back to keyboard / mouse.
+- CONTROLS.md regenerated for the controller map.
+
 ## [1.5.3] - 2026-11-02
 ### Changed
 - Enemy structure (turret) diamonds drawn in the enemy dots' red (255,40,40) instead of orange, at Darryl's request; the diamond shape stays.
