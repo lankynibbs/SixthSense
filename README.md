@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.4.6 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.4.7 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -377,3 +377,13 @@ where the camera looks.
 - The old `radar_cx/cy/d` become the 3840x1080 layout once (`v146_migrated`).
 - Reset (two clicks, or F7 held 3 s) clears only the current resolution's layout and centres the radar.
 - The F7 Display tab shows the resolution and SAVED LAYOUT / NO SAVED LAYOUT.
+
+## v1.4.7 changes
+
+- v1.4.6's per-resolution layouts were approved in game by Darryl (saved resolutions restore, unsaved ones start centred).
+- The game's settings file is found under HellForge: `%APPDATA%\Arrowhead\Helldivers2`, then
+  `%LOCALAPPDATA%\Arrowhead\Helldivers2`, then every `<HellForge>\userdata\profiles\*\user_settings.config`
+  (userdata found by going up from LOCALAPPDATA). The profile whose `screen_resolution` is the window wins, else the
+  most recently modified one (or the newest-listed folder). The `viewport:` line names the file and the render size.
+- With render_resolution 2960x832 in a 3840x1080 window (Render Scale below native), the drawable area is the
+  top-left 2960x832 and a centred radar sits in its middle. Layouts stay keyed by window size.

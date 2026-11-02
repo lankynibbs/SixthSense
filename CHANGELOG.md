@@ -6,6 +6,12 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-11-02
+### Confirmed
+- v1.4.6 per-resolution layouts approved in game by Darryl (3840x1080 <-> 1920x1080): saved resolutions restore, unsaved start centred.
+### Fixed
+- Settings file not found under HellForge: now also searched in `<HellForge>\userdata\profiles\*\user_settings.config` (profile matching the window's screen_resolution, else most recently modified); the file used is logged.
+
 ## [1.4.6] - 2026-11-02
 ### Added
 - Drawable-area (viewport) detection from `render_resolution` in the game's settings file; `viewport:` log lines.

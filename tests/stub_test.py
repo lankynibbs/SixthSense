@@ -534,7 +534,7 @@ C40 = g40.HUD_CFG
 check(os.path.exists(INI) and OLD in open(INI).read(), 'first load: rear_heat_hud.ini copied to sixth_sense.ini')
 check(abs(C40.sensitivity - 1.7) < 1e-9 and abs(C40.repeat_rate - 0.6) < 1e-9 and C40.dot_size == 'large' and abs(C40.radar_fx - 0.2) < 1e-9 and abs(C40.radar_aspect - 1.1) < 1e-9 and abs(C40.area_x0 - 11) < 1e-9, 'its sliders, area and radar keys are used')
 lg40 = open(LOGDIR + '/sixth_sense.log').read()
-check('Sixth Sense 1.4.6 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
+check('Sixth Sense 1.4.7 loaded' in lg40 and 'settings copied from' in lg40, 'log is sixth_sense.log, copy logged')
 open(LOGDIR + '/rear_heat_hud.ini', 'w').write('sensitivity=3.00\n')
 r41 = radar_rt(); u41 = r41.eval('update'); u41(0.016)
 check(abs(r41.globals().HUD_CFG.sensitivity - 1.7) < 1e-9, 'once only: an existing sixth_sense.ini is not overwritten')
@@ -715,6 +715,48 @@ check(c83.status == '2560x1440 SAVED LAYOUT', 'Display tab shows the resolution 
 click_tab(r83, 3); click_tab(r83, 3); runr(r83, 60)
 check(inilay() == '3840x1080:0.6000,0.5000,0.3000' and abs(c83.cx - 0.5) < 1e-9 and abs(c83.cy - 0.5) < 1e-9 and not c83.has_saved, 'Reset cleared only 2560x1440 (%s)' % inilay())
 runr(r83, 5); check(c83.status == '2560x1440 NO SAVED LAYOUT', 'then NO SAVED LAYOUT (%s)' % c83.status)
+# ---------------------------------------------------------------- v1.4.7: HellForge profiles settings file
+import shutil
+HF = '/tmp/hf/userdata'
+shutil.rmtree('/tmp/hf', ignore_errors=True)
+def prof(name, scr, ren):
+    d = HF + '/profiles/' + name; os.makedirs(d, exist_ok=True)
+    open(d + '/user_settings.config', 'w').write('fullscreen = false\nborderless_fullscreen = false\nrender_resolution_factor_index = 3\nrender_settings = {\n}\nscreen_resolution = [ %d %d ]\nrender_resolution = [ %d %d ]\n' % (scr + ren))
+HFENV = """
+os.getenv = function(k) if k == "LOCALAPPDATA" then return "/tmp/hf/userdata/environment/Local" elseif k == "APPDATA" then return "/tmp/hf/userdata/environment/Roaming" end return "/tmp/rh" end
+POPENS = 0
+io.popen = function(cmd) POPENS = POPENS + 1; LASTCMD = cmd; return { read = function() return PROFILES or "" end, close = function() end } end
+"""
+prof('alt', (5120, 1440), (5120, 1440)); prof('default', (3840, 1080), (2960, 832))
+open(INI, 'w').write(BASE146 + 'v146_migrated=true\nradar_layouts=\n')
+r90 = radar_rt(HFENV + '\nBBW, BBH = 3840, 1080\nPROFILES = "alt\\r\\ndefault\\r\\n"'); runr(r90, 220)
+c90 = r90.globals().SIXTH_SENSE_CAL; vp90 = r90.globals().SIXTH_SENSE_VP
+lg90 = open(LOGDIR + '/sixth_sense.log').read()
+check(vp90.rw == 2960 and vp90.rh == 832 and 'profiles/default/user_settings.config (HellForge profile, 2 found, screen_resolution matches the window' in lg90, 'HellForge: of 2 profiles the one whose screen_resolution is the window (default, 3840x1080) is used, logged')
+check('profiles' in (r90.eval('LASTCMD') or '') and 'Roaming/Arrowhead/Helldivers2/user_settings.config' in lg90, 'AppData tried first (not found), then the profiles folder listed')
+sy90 = 0.9333 * 1080 / 1440; hb90 = min(832, 1080 * sy90)
+check(vp90.w == 2960 and abs(vp90.h - hb90) < 1e-6 and 'render 2960x832' in lg90 and 'drawable rect x 0..2960' in lg90, 'render 2960x832 in a 3840x1080 window: drawable %.0fx%.0f (the gui clip %.0f is lower)' % (vp90.w, vp90.h, 1080 * sy90))
+sx90 = 1.2 * 1080 / 1440
+cx90 = (c90.x0 + c90.x1) / 2 * sx90; cy90 = (1080 - (c90.y0 + c90.y1) / 2) * sy90
+check(abs(cx90 - 1480) < 1 and abs(cy90 - hb90 / 2) < 1 and c90.x1 * sx90 <= 2960 + 1 and (1080 - c90.y0) * sy90 <= hb90 + 1, 'centred radar at the drawable centre (%.0f, %.0f px), inside 2960x%.0f' % (cx90, cy90, hb90))
+# no profile matches the window: the first listed (newest folder) when there are no modification times
+r91 = radar_rt(HFENV + '\nBBW, BBH = 1920, 1080\nPROFILES = "alt\\ndefault\\n"'); runr(r91, 220)
+check(r91.globals().SIXTH_SENSE_VP.rw == 5120 and 'first listed' in open(LOGDIR + '/sixth_sense.log').read(), 'no screen_resolution match: newest-listed profile used')
+# lfs present: the most recently modified wins
+os.utime(HF + '/profiles/alt/user_settings.config', (1000, 1000)); os.utime(HF + '/profiles/default/user_settings.config', (2000, 2000))
+LFS = '\nlfs = { dir = function(d) local t, i = {"alt", "default"}, 0; return function() i = i + 1; return t[i] end end, attributes = function(p, a) local f = io.popen and nil; if p:find("alt") then return 1000 end return 2000 end }'
+r92 = radar_rt(HFENV + LFS + '\nBBW, BBH = 1920, 1080'); runr(r92, 220)
+check(r92.globals().SIXTH_SENSE_VP.rw == 2960 and 'most recently modified' in open(LOGDIR + '/sixth_sense.log').read() and r92.eval('POPENS') == 0, 'no match, lfs times: the most recently modified profile (default) used, no dir listing')
+# AppData file present: used first, profiles not listed
+os.makedirs('/tmp/hf/userdata/environment/Roaming/Arrowhead/Helldivers2', exist_ok=True)
+open('/tmp/hf/userdata/environment/Roaming/Arrowhead/Helldivers2/user_settings.config', 'w').write('screen_resolution = [ 3840 1080 ]\nrender_resolution = [ 1920 1080 ]\n')
+r93 = radar_rt(HFENV + '\nBBW, BBH = 3840, 1080\nPROFILES = "default\\n"'); runr(r93, 220)
+check(r93.globals().SIXTH_SENSE_VP.rw == 1920 and r93.eval('POPENS') == 0 and 'Roaming/Arrowhead/Helldivers2/user_settings.config' in r93.globals().SIXTH_SENSE_VP.src + open(LOGDIR + '/sixth_sense.log').read(), 'AppData user_settings.config found: used first, profiles not searched')
+# render >= window: the whole window is drawable
+open('/tmp/hf/userdata/environment/Roaming/Arrowhead/Helldivers2/user_settings.config', 'w').write('render_resolution = [ 3840 1080 ]\n')
+r94 = radar_rt(HFENV + '\nBBW, BBH = 3840, 1080'); runr(r94, 220)
+check(r94.globals().SIXTH_SENSE_VP.w == 3840 and 'window (back buffer)' in r94.globals().SIXTH_SENSE_VP.src, 'render_resolution = window: the whole window is drawable')
+shutil.rmtree('/tmp/hf', ignore_errors=True)
 os.remove(LOGDIR + '/rear_heat_hud.ini')
 print('calibration test:', 'PASS' if not fails else 'FAIL %d' % len(fails))
 if fails: raise SystemExit(1)

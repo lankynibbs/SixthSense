@@ -3,18 +3,19 @@
 > Current state only, in five parts. Update in place at each checkpoint. Rationale, decisions, and history go to [docs/history/](docs/history/), and release notes go to [CHANGELOG.md](CHANGELOG.md).
 
 ## Current goal
-Get **v1.4.6** confirmed in game: a 360° north-up enemy radar HUD for Helldivers 2, a Lua addon under HellForge's Bingus Shared Loader (LuaJIT, offline build 25480438). Work goes on `develop`; batch several fixes per build.
+Get **v1.4.7** confirmed in game: a 360° north-up enemy radar HUD for Helldivers 2, a Lua addon under HellForge's Bingus Shared Loader (LuaJIT, offline build 25480438). Work goes on `develop`; batch several fixes per build.
 
 ## What is done
-- v1.4.6: drawable area detected from `render_resolution` in `user_settings.config` (top-left of the window, cut at the gui's bottom), logged as `viewport:`. Placement is fractions of that area, saved per resolution in `radar_layouts=WxH:cx,cy,d;...`; unsaved resolutions start centred at the default size; Reset clears only the current resolution. Display tab shows the resolution and SAVED / NO SAVED LAYOUT.
-- F7 page: **Display** and **Settings** tabs, grab and corner handles, two-click Reset, F7 held 3 s. Mouse only: no `[ ]`, no F8.
-- Settings tab: Size, Sensitivity, Repeat rate, Dot size sliders; **Shown / Hidden** buttons (`visibility=shown|hidden`).
-- Dots 12/24/44/58 px at 1080 tall (× dot_size). Turrets are orange diamonds; pods and dead enemies excluded.
+- v1.4.6 per-resolution layouts (`radar_layouts=WxH:cx,cy,d;...`, unsaved = centred, Reset clears current only): **approved in game by Darryl** (3840x1080 <-> 1920x1080).
+- v1.4.7: settings file search APPDATA -> LOCALAPPDATA -> `<HellForge>\userdata\profiles\*\user_settings.config` (window-matching screen_resolution, else newest); drawable area = top-left render_resolution (Darryl: 2960x832 in 3840x1080), cut at the gui clip; logged as `viewport:`.
+- F7 page: Display / Settings tabs, grab and corner handles, two-click Reset, F7 held 3 s, resolution + SAVED / NO SAVED LAYOUT line. Mouse only: no `[ ]`, no F8.
+- Settings: Size, Sensitivity, Repeat rate, Dot size sliders; Shown / Hidden buttons. Dots 12/24/44/58 px at 1080.
 
 ## What is blocked
-- Darryl's in-game test of v1.4.6: check the `viewport:` lines (is `user_settings.config` found? does the drawable rect match what he sees?).
-- The gui transform (1.2/0.9333 at 1080 tall) is still only measured at 3840x1080.
-- Illuminate turret ids unknown (`static?:` lines). Possible custom radar PNG from Darryl.
+- Darryl's in-game check of v1.4.7: does the `viewport:` line now name `profiles\default\user_settings.config` and render 2960x832, and does the radar stay inside the visible area?
+- Whether io.popen/lfs exist under Bingus (profile listing); `default` is always tried regardless.
+- Gui.resolution returns "596 1": meaning unknown, logged only. GUI transform still only measured at 3840x1080.
+- Illuminate turret ids unknown (`static?:` lines).
 
 ## Key file paths / locations
 - Repo: box `/workspace/hd2-research/rear_heat_hud`, remote `lankynibbs/SixthSense`, branch `develop`.
@@ -24,4 +25,4 @@ Get **v1.4.6** confirmed in game: a 360° north-up enemy radar HUD for Helldiver
 - User docs and per-version notes: [README.md](README.md).
 
 ## Next concrete action
-Get Darryl's v1.4.6 `sixth_sense.log` from two or more resolutions (and a Render Scale below native) and compare the `viewport:` lines with where the radar really appears; if the settings file is not found under HellForge, add its real path.
+Get Darryl's v1.4.7 `sixth_sense.log` at 3840x1080 with Render Scale 77% (2960x832) and at native; confirm the drawable rect matches what he sees.

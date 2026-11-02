@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.4.6 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.4.7 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.4.6"
+local MOD, VERSION = "sixth_sense", "1.4.7"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -171,7 +171,7 @@ panel_fy=0.08
 ;   radar_layouts=3840x1080:0.5000,0.7500,0.3500;2560x1440:0.3000,0.6000,0.3000
 ; cx, cy = the radar's centre as fractions of the DRAWABLE area (cy from its top), d = its diameter as a fraction of
 ; the drawable height. The drawable area is the part of the window the mod can draw on: the render size from the game's
-; user_settings.config (render_resolution: Render Scale below native, or a Resolution smaller than the window) anchored
+; user_settings.config (APPDATA, LOCALAPPDATA, then HellForge's userdata\profiles\*; render_resolution) anchored
 ; top-left, cut at the bottom where the game clips the gui (see the "viewport:" lines in sixth_sense.log). Going back
 ; to a resolution restores its layout; one with none saved starts centred in the drawable area at the default size. Reset (two clicks, or F7 held 3 s) clears only the current resolution's entry. Written by calibration.
 radar_layouts=
@@ -202,7 +202,7 @@ local LAYOUTS_COMMENT = [[; radar_layouts (v1.4.6): the radar's place saved per 
 ;   radar_layouts=3840x1080:0.5000,0.7500,0.3500;2560x1440:0.3000,0.6000,0.3000
 ; cx, cy = the radar's centre as fractions of the DRAWABLE area (cy from its top), d = its diameter as a fraction of
 ; the drawable height. The drawable area is the part of the window the mod can draw on: the render size from the game's
-; user_settings.config (render_resolution: Render Scale below native, or a Resolution smaller than the window) anchored
+; user_settings.config (APPDATA, LOCALAPPDATA, then HellForge's userdata\profiles\*; render_resolution) anchored
 ; top-left, cut at the bottom where the game clips the gui (see the "viewport:" lines in sixth_sense.log). Going back
 ; to a resolution restores its layout; one with none saved starts centred in the drawable area at the default size. Reset (two clicks, or F7 held 3 s) clears only the current resolution's entry. Written by calibration.]]
 local VIS_COMMENT = [[; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
@@ -1062,27 +1062,82 @@ local function ybot() return math.min(1, CFG.gy_top * CFG.sy_scale / CAL.sh) end
 -- resolution change and every 10 s; the bottom is cut where the gui clips (gy 0). Gui.resolution is logged as well.
 local VP = { x = 0, y = 0, w = 1920, h = 1080, src = "default", key = nil }
 _G.SIXTH_SENSE_VP = VP                            -- (read by the stub test)
-local function settings_render_res()
+-- v1.4.7 settings file search: %APPDATA%\Arrowhead\Helldivers2, %LOCALAPPDATA%\Arrowhead\Helldivers2, then HellForge's
+-- <...>\userdata\profiles\*\user_settings.config (userdata found by going up from LOCALAPPDATA, which HellForge points at
+-- <HellForge>\userdata\environment\Local). Darryl's game reads profiles\default; the redirected AppData has none.
+-- Profiles are listed with lfs when present, else "dir /b /ad /o-d" through io.popen (newest folder first), and
+-- "default" is always tried. Among the files found, one whose screen_resolution is the window's wins; else the most
+-- recently modified (lfs), else the first listed (newest folder).
+local function read_cfg(path)
+  local f = io.open(path, "r"); if not f then return nil end
+  local txt = f:read("*a") or ""; f:close()
+  local rw, rh = txt:match("[%s{]render_resolution%s*=%s*%[%s*(%d+)%s+(%d+)%s*%]")
+  local qw, qh = txt:match("[%s{]screen_resolution%s*=%s*%[%s*(%d+)%s+(%d+)%s*%]")
+  if not rw then rw, rh = txt:match("^render_resolution%s*=%s*%[%s*(%d+)%s+(%d+)%s*%]") end
+  if not qw then qw, qh = txt:match("^screen_resolution%s*=%s*%[%s*(%d+)%s+(%d+)%s*%]") end
+  return { path = path, rw = tonumber(rw), rh = tonumber(rh), qw = tonumber(qw), qh = tonumber(qh) }
+end
+local function list_profiles(dir)
+  local names, how = {}, "default only"
+  local lfs = rawget(_G, "lfs")
+  if type(lfs) == "table" and type(lfs.dir) == "function" then
+    local ok = pcall(function() for n in lfs.dir(dir) do if n ~= "." and n ~= ".." then names[#names + 1] = n end end end)
+    if ok then how = "lfs" end
+  end
+  if #names == 0 and type(io.popen) == "function" then
+    local ok, p = pcall(io.popen, 'dir /b /ad /o-d "' .. dir .. '" 2>nul')
+    if ok and p then
+      local okr, out = pcall(p.read, p, "*a"); pcall(p.close, p)
+      if okr and type(out) == "string" then for n in out:gmatch("[^\r\n]+") do names[#names + 1] = n end end
+      if #names > 0 then how = "dir listing (newest first)" end
+    end
+  end
+  local seen = {}
+  for _, n in ipairs(names) do seen[n:lower()] = true end
+  if not seen.default then names[#names + 1] = "default" end
+  return names, how
+end
+local function settings_render_res(sw, sh)
   local tried = {}
   for _, env in ipairs({ "APPDATA", "LOCALAPPDATA" }) do
     local base = os.getenv(env)
     if type(base) == "string" and base ~= "" then
       local path = base .. "\\Arrowhead\\Helldivers2\\user_settings.config"
       tried[#tried + 1] = path
-      local f = io.open(path, "r")
-      if f then
-        local txt = f:read("*a") or ""; f:close()
-        local rw, rh = txt:match("[%s{]render_resolution%s*=%s*%[%s*(%d+)%s+(%d+)%s*%]")
-        if rw then return tonumber(rw), tonumber(rh), path end
-        return nil, nil, path .. " (no render_resolution)"
-      end
+      local c = read_cfg(path)
+      if c and c.rw then return c.rw, c.rh, path end
+      if c then tried[#tried] = path .. " (no render_resolution)" end
     end
   end
+  local root = tostring(os.getenv("LOCALAPPDATA") or ""):match("^(.-[\\/][Uu][Ss][Ee][Rr][Dd][Aa][Tt][Aa])[\\/]")
+  if root then
+    local pdir = root .. "\\profiles"
+    local names, how = list_profiles(pdir)
+    local found, best = {}, nil
+    for _, n in ipairs(names) do
+      local path = pdir .. "\\" .. n .. "\\user_settings.config"
+      local c = read_cfg(path)
+      if c and c.rw then
+        local lfs = rawget(_G, "lfs")
+        if type(lfs) == "table" and type(lfs.attributes) == "function" then local ok, m = pcall(lfs.attributes, path, "modification"); c.mtime = ok and tonumber(m) or nil end
+        found[#found + 1] = c
+      else tried[#tried + 1] = path .. (c and " (no render_resolution)" or "") end
+    end
+    for _, c in ipairs(found) do if c.qw == sw and c.qh == sh then best = c; best.why = "screen_resolution matches the window"; break end end
+    if not best then
+      for _, c in ipairs(found) do if c.mtime and (not best or c.mtime > best.mtime) then best = c end end
+      if best then best.why = "most recently modified" elseif found[1] then best = found[1]; best.why = "first listed (" .. how .. "), no modification times" end
+    end
+    if best then
+      return best.rw, best.rh, string.format("%s (HellForge profile, %d found, %s; screen_resolution %s; not found before it: %s)", best.path, #found, best.why,
+        best.qw and (best.qw .. "x" .. best.qh) or "?", #tried > 0 and table.concat(tried, ", ") or "-")
+    end
+  else tried[#tried + 1] = "(no HellForge userdata folder in LOCALAPPDATA)" end
   return nil, nil, #tried > 0 and ("not found: " .. table.concat(tried, ", ")) or "no APPDATA"
 end
 local function viewport(sw, sh, why)
   local w, h, src = sw, sh, "window (back buffer)"
-  local rw, rh, rsrc = settings_render_res()
+  local rw, rh, rsrc = settings_render_res(sw, sh)
   if rw and rh and rw > 0 and rh > 0 and (rw < sw - 1 or rh < sh - 1) then
     w, h, src = math.min(sw, rw), math.min(sh, rh), string.format("render_resolution %dx%d (top-left of the window)", rw, rh)
   end

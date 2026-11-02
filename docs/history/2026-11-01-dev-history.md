@@ -59,3 +59,8 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 ## Per-resolution layouts (v1.4.6, 2026-11-02)
 - Darryl: the drawable area does not cover the whole window at some resolutions. Chef Shared Loader 1.3.1 had found why on this game: a screen GUI in the game's world shows only the render size's worth of the window (top-left) when Render Scale is below native or the Resolution is below the window. v1.4.6 reads `render_resolution` from `user_settings.config` (as Chef does) and normalises placement to that rect.
 - Layouts saved per window resolution; Darryl asked that unsaved resolutions default to the centre (no nearest-layout fallback).
+
+## Settings file under HellForge (v1.4.7, 2026-11-02)
+- Darryl approved v1.4.6 layouts. His log showed the settings file not found in the redirected AppData; HellForge's real one is `<HellForge>\userdata\profiles\default\user_settings.config` (screen 3840x1080, render 2960x832, Render Scale index 3). The C:\ AppData file (5120x1440 borderless) is not the one HellForge uses. v1.4.7 searches the profiles folder and picks the profile matching the window.
+- Layouts stay keyed by window size, not render scale: fractions of the drawable area already absorb a render-scale change, and Darryl approved per-resolution keys.
+- Gui.resolution returned "596 1": not understood (not a size); logged only.
