@@ -6,6 +6,10 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-02
+### Changed
+- `radar_color` tints only the radar display (disc, rings, cross hairs). Enemy dots stay red and enemy structures orange in every colour; v1.5.1's per-colour dot shades removed. Darryl confirmed the colour change works in game.
+
 ## [1.5.1] - 2026-11-02
 ### Added
 - Radar colours: green (default), white, yellow, red, light blue. "Radar color" snap slider on the F7 Settings tab (mouse only) with a swatch; tints the disc, rings, cross hairs and enemy dots (enemy structures stay orange). `radar_color` in the ini with a comment; Reset restores green.

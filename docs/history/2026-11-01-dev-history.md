@@ -77,3 +77,6 @@ Nothing showed on screen where expected, so drawing was debugged step by step:
 
 ## Radar colours (v1.5.1, 2026-11-02)
 - Darryl asked for colour options besides green: white, yellow, red, light blue. Added as a fifth snap slider (mouse only, like Dot size) with a swatch instead of a text value (the pixel font lacks some letters). To recolour the disc without five textures, `radar_disc.png` is now white lines on a neutral dark fill and tinted through the `Color` argument of `Gui.bitmap` (not yet proven in game: if the engine ignores the tint the disc shows white). Green keeps red enemy dots so the default is unchanged; other colours use a brighter dot of the same hue. Enemy structures stay orange.
+
+## Radar colour on the display only (v1.5.2, 2026-11-02)
+- Darryl confirmed the v1.5.1 colour change works in game (the Gui.bitmap tint recolours the disc), but the colour was meant for the radar display only, not the enemy markers. v1.5.2 drops the per-colour dot shades: enemy dots are always red, enemy structures always orange; `radar_color` tints the disc, rings and cross hairs.

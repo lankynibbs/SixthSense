@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.5.1 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.5.2 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.5.1"
+local MOD, VERSION = "sixth_sense", "1.5.2"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -144,9 +144,9 @@ radar_style=auto
 ; reset to medium once, so everyone sees the bigger v1.4.4 dots.)
 dot_size=medium
 v144_migrated=true
-; radar_color (v1.5.1): the radar's colour (disc, rings, cross hairs, enemy dots): green (default), white, yellow,
+; radar_color (v1.5.1): the radar display's colour (disc, rings, cross hairs; v1.5.2: not the enemy markers): green (default), white, yellow,
 ; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
-; Enemy structures stay orange diamonds in every colour.
+; Enemy dots stay red and enemy structures orange diamonds in every colour.
 radar_color=green
 ; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
 ; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
@@ -209,18 +209,19 @@ local LAYOUTS_COMMENT = [[; radar_layouts (v1.4.6): the radar's place saved per 
 ; user_settings.config (APPDATA, LOCALAPPDATA, then HellForge's userdata\profiles\*; render_resolution) anchored
 ; top-left, cut at the bottom where the game clips the gui (see the "viewport:" lines in sixth_sense.log). Going back
 ; to a resolution restores its layout; one with none saved starts centred in the drawable area at the default size. Reset (two clicks, or F7 held 3 s) clears only the current resolution's entry. Written by calibration.]]
-local COLOR_COMMENT = [[; radar_color (v1.5.1): the radar's colour (disc, rings, cross hairs, enemy dots): green (default), white, yellow,
+local COLOR_COMMENT = [[; radar_color (v1.5.1): the radar display's colour (disc, rings, cross hairs; v1.5.2: not the enemy markers): green (default), white, yellow,
 ; red or light_blue. "Radar color" snap slider on the F7 page's Settings tab (mouse only); Reset puts it back to green.
-; Enemy structures stay orange diamonds in every colour.]]
--- v1.5.1 radar colours: ring = disc tint, rings and cross hairs; dot = enemy dots (green keeps its red dots)
+; Enemy dots stay red and enemy structures orange diamonds in every colour.]]
+-- v1.5.1 radar colours: ring = disc tint, rings and cross hairs. v1.5.2: the radar display only; enemy dots stay red
+-- and enemy structures orange in every colour
 local COLOR_NAMES = { "green", "white", "yellow", "red", "light_blue" }
 local COLOR_IDX = { green = 1, white = 2, yellow = 3, red = 4, light_blue = 5 }
 local PALETTE = {
-  green = { ring = { 90, 255, 140 }, dot = { 255, 40, 40 } },
-  white = { ring = { 235, 235, 235 }, dot = { 255, 255, 255 } },
-  yellow = { ring = { 255, 225, 60 }, dot = { 255, 240, 0 } },
-  red = { ring = { 255, 70, 60 }, dot = { 255, 20, 20 } },
-  light_blue = { ring = { 110, 200, 255 }, dot = { 160, 225, 255 } },
+  green = { ring = { 90, 255, 140 } },
+  white = { ring = { 235, 235, 235 } },
+  yellow = { ring = { 255, 225, 60 } },
+  red = { ring = { 255, 70, 60 } },
+  light_blue = { ring = { 110, 200, 255 } },
 }
 _G.SIXTH_SENSE_PALETTE = PALETTE
 local VIS_COMMENT = [[; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
@@ -1629,7 +1630,7 @@ local function draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
   local before = S.draw_ok + S.draw_fail
   local style = "dots"
   local PC = PALETTE[CFG.radar_color] or PALETTE.green
-  local RC, DC = PC.ring, PC.dot
+  local RC = PC.ring
   I.color = CFG.radar_color
   if CFG.radar_style ~= "dots" then
     local d = 2 * rpx / TEX_RIM                   -- the texture's size in screen px (its rim on the overlay's circle)
@@ -1665,7 +1666,7 @@ local function draw_radar(gbox, ax0, ay0, aw, ah, SX, SY, sh, sc)
         gbox(px - w * 0.2, py - h * 0.5, w * 0.4, h * 0.3, a, 255, 110, 20)
       else
         local w, h = s / SX, s / SY
-        gbox(px - w / 2, py - h / 2, w, h, a, DC[1], DC[2], DC[3])
+        gbox(px - w / 2, py - h / 2, w, h, a, 255, 40, 40)   -- (v1.5.2: always red)
       end
       ndots = ndots + 1
     end
@@ -1901,10 +1902,9 @@ local function draw()
       local one = tx + tw * ((d.tick or 1) - d.min) / (d.max - d.min)
       local k = sh / 1080
       draw_label(gbox, d.name == "scale" and "size" or d.name, tx - 16 / SX, ty + th / 2, k)
-      if d.name == "radar_color" then                                     -- v1.5.1: a swatch of the colour (ring, with its dot inside)
+      if d.name == "radar_color" then                                     -- v1.5.1: a swatch of the colour
         local c = (PALETTE[CFG.radar_color] or PALETTE.green)
         gbox(tx + tw + 18 / SX, ty + th / 2 - 14 / SY, 56 / SX, 28 / SY, 255, c.ring[1], c.ring[2], c.ring[3])
-        gbox(tx + tw + 38 / SX, ty + th / 2 - 6 / SY, 16 / SX, 12 / SY, 255, c.dot[1], c.dot[2], c.dot[3])
       else
       pixel_text(gbox, slider_value(i), tx + tw + 18 / SX, ty + th / 2, 2 * k, "left", 240, d.rgb[1], d.rgb[2], d.rgb[3])
       end

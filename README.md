@@ -1,6 +1,6 @@
 # Sixth Sense (formerly Rear Heat HUD; HellForge / offline HD2 build 25480438)
 
-*Sixth Sense v1.5.1 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
+*Sixth Sense v1.5.2 is a 360-degree enemy radar. The section below describes the original v0.x bars; see the version notes at the end for what it is now.*
 
 Three bars at the bottom centre of the screen: **left-rear, rear, right-rear**. Each one fades from clear to yellow
 to red as the threat behind you rises. Threat in a sector = the sum, over living enemies within `range` metres
@@ -423,3 +423,10 @@ where the camera looks.
   a brighter dot of the same colour). Enemy structures stay orange diamonds in every colour. Saved as
   `radar_color=green|white|yellow|red|light_blue` (with a comment); an unknown value falls back to green. Reset on the
   Settings tab restores green.
+
+## v1.5.2 changes
+
+- **Radar colour applies to the radar display only** (Darryl: colour changing works, but not on the enemy markers).
+  `radar_color` (green default, white, yellow, red, light_blue) tints the disc, rings and cross hairs only; enemy
+  dots are always red and enemy structures always orange diamonds. The per-colour dot shades from v1.5.1 are gone,
+  and the slider's swatch shows just the radar colour. Still mouse only, saved in the ini, Reset restores green.
