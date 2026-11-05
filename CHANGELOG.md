@@ -6,6 +6,11 @@ Versions before v1.3.2 were built before the repo was put under git and are unda
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-05
+### Changed
+- User interface cleanup on the F7 page: an electric blue dark theme from one named palette (panel, buttons, sliders, focus frame); buttons show off / hover / on states with a border and an accent stripe; sliders have a muted track, an accent fill and a white knob that turns pure white while dragged.
+- One hit-region list and action dispatcher behind the F7 page's mouse input: every control registers its region as it is drawn, so hover comes for free and the sliders keep their padded hit areas. Controls, settings and the ini are unchanged.
+
 ## [1.5.6] - 2026-11-02
 ### Changed
 - The repo is public: README (homepage, browse / clone, CONTROLS.md, issues) and CONTROLS.md link https://github.com/lankynibbs/SixthSense; the "private repo" note is gone. In-game Help regenerated from them shows the URLs (web links keep their URL in the Help pages).
