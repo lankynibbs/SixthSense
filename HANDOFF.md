@@ -3,7 +3,7 @@
 > Current state only, in five parts. Update in place at each checkpoint. Rationale, decisions, and history go to [docs/history/](docs/history/), and release notes go to [CHANGELOG.md](CHANGELOG.md).
 
 ## Current goal
-Get **v1.5.6** confirmed in game (with v1.4.7's settings-file fix): a 360° north-up enemy radar HUD for Helldivers 2, a Lua addon under HellForge's Bingus Shared Loader (LuaJIT, offline build 25480438). Work goes on `develop`; batch several fixes per build.
+Get **v1.6.0** confirmed in game (with v1.4.7's settings-file fix): a 360° north-up enemy radar HUD for Helldivers 2, a Lua addon under HellForge's Bingus Shared Loader (LuaJIT, offline build 25480438). Work goes on `develop`; batch several fixes per build.
 
 ## What is done
 - v1.4.6 per-resolution layouts (`radar_layouts`, unsaved = centred, Reset clears current only): approved in game by Darryl.
@@ -15,6 +15,7 @@ Get **v1.5.6** confirmed in game (with v1.4.7's settings-file fix): a 360° nort
 - v1.5.4 (controller confirmed working in game by Darryl): control scheme `control=keyboard_mouse|controller` (Controls buttons on Settings). Controller: View held 2 s page on/off (5 s reset), LB/RB tabs, X Reset, B close, D-pad move / rows, Y/A size. See CONTROLS.md (regenerated on request only).
 - v1.5.5: Help button (4th) shows README.md + CONTROLS.md in game; pages rendered and text embedded at build time by `tools/help_pages.py` (run by `tools/build.py`). Controller: R3 Help, LB/RB pages, B closes Help (verified in game by Darryl).
 - v1.5.6: repo public (https://github.com/lankynibbs/SixthSense); README / CONTROLS.md / in-game Help link it.
+- v1.6.0 (`pretty-ui` branch): user interface cleanup: electric blue named palette (`UI` table), off / hover / on buttons, cleaner sliders, one region list + action dispatcher (`RG`) for the F7 page mouse input. Not yet tested in game.
 - F7 page: Display / Settings tabs, grab and corner handles, Reset, Help, F7 held 3 s, resolution line. No `[ ]`, no F8. Settings: 5 sliders (Size, Sensitivity, Repeat rate, Dot size, Radar color) + Shown / Hidden + Controls.
 
 ## What is blocked
