@@ -235,19 +235,19 @@ local PALETTE = {
 _G.SIXTH_SENSE_PALETTE = PALETTE
 -- pretty-ui: the F7 menu's named colours, { a, r, g, b }
 local UI = {
-  bg       = { 215, 10, 14, 20 },     -- panel backing, near-black blue-grey
-  panel    = { 235, 16, 21, 29 },     -- help frame, a step lighter
-  btn      = { 200, 26, 32, 42 },     -- button, off
-  hover    = { 220, 38, 48, 62 },     -- button under the cursor
-  selected = { 240, 0, 120, 160 },    -- button, on
-  accent   = { 255, 0, 170, 220 },    -- teal-cyan: stripes, slider fill
-  border   = { 200, 58, 70, 86 },     -- 1 px outlines
-  track    = { 200, 40, 46, 56 },     -- slider track
+  bg       = { 215, 12, 14, 18 },     -- panel backing, near-black blue-grey
+  panel    = { 235, 18, 22, 28 },     -- help frame, a step lighter
+  btn      = { 200, 28, 34, 44 },     -- button, off
+  hover    = { 220, 40, 50, 64 },     -- button under the cursor
+  selected = { 240, 0, 120, 215 },    -- button, on
+  accent   = { 255, 0, 150, 255 },    -- teal-cyan: stripes, slider fill
+  border   = { 200, 50, 60, 75 },     -- 1 px outlines
+  track    = { 200, 35, 42, 52 },     -- slider track
   tick     = { 200, 120, 130, 145 },  -- slider 1.0 tick
-  knob     = { 255, 230, 234, 238 },  -- slider knob (white while dragged)
-  text     = { 255, 241, 236, 228 },  -- warm white
-  muted    = { 255, 150, 156, 166 },
-  focus    = { 255, 255, 210, 80 },   -- controller focus frame
+  knob     = { 255, 220, 230, 240 },  -- slider knob (white while dragged)
+  text     = { 255, 230, 235, 240 },  -- warm white
+  muted    = { 255, 140, 150, 165 },
+  focus    = { 255, 0, 180, 255 },   -- controller focus frame
 }
 local VIS_COMMENT = [[; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
 ; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
@@ -1892,8 +1892,39 @@ local function pad_input(sw, sh)
     end
   end
 end
+-- pretty-ui: the F7 panel's hit regions. Drawing registers each control (id + rect, optional padding);
+-- input resolves the cursor against the last drawn list once and dispatches to action(id).
+local RG = { list = {} }                             -- one local: the main chunk is near Lua's 200-local limit
+function RG.add(id, x, y, w, h, px, py)
+  px, py = px or 0, py or 0
+  local L = RG.list
+  L[#L + 1] = { id = id, x0 = x - px, y0 = y - py, x1 = x + w + px, y1 = y + h + py }
+end
+function RG.at(gx, gy)                     -- the last registered (topmost) region under the cursor
+  if not gx then return nil end
+  local L = RG.list
+  for i = #L, 1, -1 do
+    local r = L[i]
+    if gx >= r.x0 and gx <= r.x1 and gy >= r.y0 and gy <= r.y1 then return r.id end
+  end
+end
+function RG.action(id, sw, sh)                    -- one handler for every panel control; sets CAL.drag
+  local kind, arg = id:match("^(%w+):?(.*)$")
+  CAL.drag = "tab"
+  if kind == "tab" then
+    if CAL.tab ~= arg then CAL.armed = nil; CAL.tab = arg; say("calibration tab: " .. CAL.tab) end
+  elseif kind == "reset" then reset_click(sw, sh)
+  elseif kind == "help" then help_open("Help button")
+  elseif kind == "vis" then
+    if CFG.visibility ~= arg then CFG.visibility = arg; CAL.dirty = true; say("visibility: " .. CFG.visibility) end
+  elseif kind == "ctl" then
+    if CFG.control ~= arg then CFG.control = arg; CAL.dirty = true; say("control: " .. CFG.control .. " (mouse)") end
+  elseif kind == "slider" then CAL.drag = tonumber(arg)
+  else CAL.drag = nil end
+end
 local function cal_input(sw, sh, gx, gy)
   CAL.mgx, CAL.mgy = gx, gy                          -- pretty-ui: for hover
+  CAL.hot = (CAL.on and not CAL.help) and RG.at(gx, gy) or nil
   if CAL.help then                                   -- v1.5.5: Help open: only the help's own clicks and the wheel
     if CAL.armed and S.t >= CAL.armed then CAL.armed = nil end
     help_mouse(gx, gy)
@@ -1916,41 +1947,7 @@ local function cal_input(sw, sh, gx, gy)
   if not gx then return end
   if IN.lmb and not CAL.was_lmb then           -- the button went down: what is under the cursor?
     CAL.drag = nil
-    for i = 1, #TABS do
-      local x, y, w, h = tab_rect(i)
-      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
-        if CAL.tab ~= TABS[i].id then CAL.armed = nil; CAL.tab = TABS[i].id; say("calibration tab: " .. CAL.tab) end
-        CAL.drag = "tab"; break
-      end
-    end
-    if not CAL.drag then
-      local x, y, w, h = tab_rect(3)
-      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; reset_click(sw, sh) end
-    end
-    if not CAL.drag then                         -- v1.5.5: Help (button 4, both tabs)
-      local x, y, w, h = tab_rect(4)
-      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then CAL.drag = "tab"; help_open("Help button") end
-    end
-    for i = 1, (CAL.drag or disp) and 0 or #VIS_BTN do          -- v1.4.5: Shown / Hidden (a click picks one)
-      local x, y, w, h = vis_rect(i)
-      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
-        CAL.drag = "tab"
-        if CFG.visibility ~= VIS_BTN[i].id then CFG.visibility = VIS_BTN[i].id; CAL.dirty = true; say("visibility: " .. CFG.visibility) end
-        break
-      end
-    end
-    for i = 1, (CAL.drag or disp) and 0 or #CTL_BTN do          -- v1.5.4: Controls (keyboard / mouse or controller)
-      local x, y, w, h = ctl_rect(i)
-      if gx >= x and gx <= x + w and gy >= y and gy <= y + h then
-        CAL.drag = "tab"
-        if CFG.control ~= CTL_BTN[i].id then CFG.control = CTL_BTN[i].id; CAL.dirty = true; say("control: " .. CFG.control .. " (mouse)") end
-        break
-      end
-    end
-    for i = 1, (CAL.drag or disp) and 0 or #SL do
-      local tx, ty, tw, th = slider_rect(i)
-      if gx >= tx - 15 and gx <= tx + tw + 15 and gy >= ty - 12 and gy <= ty + th + 12 then CAL.drag = i; break end
-    end
+    if CAL.hot then RG.action(CAL.hot, sw, sh) end
     if not CAL.drag and disp then
       local x, y, w, h = grab_rect()
       local hw, hh = 40 / CFG.sx_scale, 40 / CFG.sy_scale
@@ -2335,12 +2332,10 @@ local function draw()
       local t1, t2 = 1 / SX, 1 / SY
       ui(c, x, y, w, t2); ui(c, x, y + h - t2, w, t2); ui(c, x, y, t1, h); ui(c, x + w - t1, y, t1, h)
     end
-    local function over(x, y, w, h)
-      local mx, my = CAL.mgx, CAL.mgy
-      return mx and mx >= x and mx <= x + w and my >= y and my <= y + h
-    end
-    local function ui_button(x, y, w, h, label, on)      -- off / hover / on, with a border and an accent stripe when on
-      ui(on and UI.selected or (over(x, y, w, h) and UI.hover or UI.btn), x, y, w, h)
+    RG.list = {}
+    local function ui_button(id, x, y, w, h, label, on)  -- off / hover / on, with a border and an accent stripe when on
+      RG.add(id, x, y, w, h)
+      ui(on and UI.selected or (CAL.hot == id and UI.hover or UI.btn), x, y, w, h)
       outline(on and UI.accent or UI.border, x, y, w, h)
       if on then ui(UI.accent, x, y, w, 4 / SY) end
       draw_label(gbox, label, x + w / 2 + (LABEL_TEX[label][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
@@ -2355,9 +2350,9 @@ local function draw()
       if CAL.has_saved then pixel_text(gbox, txt, x, y - 22 / SY, 2 * kk, "left", 240, 80, 255, 120)
       else pixel_text(gbox, txt, x, y - 22 / SY, 2 * kk, "left", 240, 255, 190, 60) end
     end
-    local function button(i, label, on)
+    local function button(i, id, label, on)
       local x, y, w, h = tab_rect(i)
-      ui_button(x, y, w, h, label, on)
+      ui_button(id, x, y, w, h, label, on)
     end
     if CAL.help then                                                         -- v1.5.5: the help page (under the buttons)
       local hx, hy, hw, hh, wpx, hpx = help_rect()
@@ -2366,13 +2361,14 @@ local function draw()
       if pg and tex_centred(pg[1], hx + hw / 2, hy + hh / 2, wpx, hpx, "help page") then CAL.help_drawn = (CAL.help_drawn or 0) + 1
       else pixel_text(gbox, "HELP: SEE README.MD AND CONTROLS.MD", hx + 20 / SX, hy + hh / 2, 3 * kk, "left", 255, 255, 255, 255) end
     end
-    for i = 1, #TABS do button(i, TABS[i].label, CAL.tab == TABS[i].id and not CAL.help) end   -- the tab buttons; the active one lit
-    button(3, "tab_reset", CAL.armed ~= nil and S.t < CAL.armed)              -- Reset (both tabs), lit while armed
-    button(4, "tab_help", CAL.help == true)                                   -- v1.5.5: Help, lit while open
+    for i = 1, #TABS do button(i, "tab:" .. TABS[i].id, TABS[i].label, CAL.tab == TABS[i].id and not CAL.help) end   -- the tab buttons; the active one lit
+    button(3, "reset", "tab_reset", CAL.armed ~= nil and S.t < CAL.armed)              -- Reset (both tabs), lit while armed
+    button(4, "help", "tab_help", CAL.help == true)                                   -- v1.5.5: Help, lit while open
     if CAL.tab == "settings" and not CAL.help then
     for i = 1, #SL do                                                        -- the sliders: track, fill, knob, tick at 1.0
       local d = SL[i]
       local tx, ty, tw, th = slider_rect(i)
+      RG.add("slider:" .. i, tx, ty, tw, th, 15, 12)                -- padded hit area
       ui(UI.track, tx, ty, tw, th); outline(UI.border, tx, ty, tw, th)
       local kx = knob_x(tx, tw, i)
       ui(UI.accent, tx, ty, kx - tx, th)
@@ -2395,7 +2391,7 @@ local function draw()
       for i = 1, #VIS_BTN do
         local x, y, w, h = vis_rect(i)
         local on = CFG.visibility == VIS_BTN[i].id
-        ui_button(x, y, w, h, VIS_BTN[i].label, on)
+        ui_button("vis:" .. VIS_BTN[i].id, x, y, w, h, VIS_BTN[i].label, on)
       end
     end
     do                                                                       -- v1.5.4: Controls buttons
@@ -2404,7 +2400,7 @@ local function draw()
       for i = 1, #CTL_BTN do
         local x, y, w, h = ctl_rect(i)
         local on = CFG.control == CTL_BTN[i].id
-        ui_button(x, y, w, h, CTL_BTN[i].label, on)
+        ui_button("ctl:" .. CTL_BTN[i].id, x, y, w, h, CTL_BTN[i].label, on)
       end
     end
     if not kbm then                                                          -- v1.5.4: the controller's row, framed yellow
