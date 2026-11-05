@@ -240,12 +240,13 @@ local UI = {
   btn      = { 200, 28, 34, 44 },     -- button, off
   hover    = { 220, 40, 50, 64 },     -- button under the cursor
   selected = { 240, 0, 120, 215 },    -- button, on
-  accent   = { 255, 0, 150, 255 },    -- teal-cyan: stripes, slider fill
+  accent   = { 255, 0, 150, 255 },    -- electric blue: stripes, slider fill
   border   = { 200, 50, 60, 75 },     -- 1 px outlines
   track    = { 200, 35, 42, 52 },     -- slider track
   tick     = { 200, 120, 130, 145 },  -- slider 1.0 tick
-  knob     = { 255, 220, 230, 240 },  -- slider knob (white while dragged)
-  text     = { 255, 230, 235, 240 },  -- warm white
+  knob     = { 255, 220, 230, 240 },  -- slider knob
+  knob_drag = { 255, 255, 255, 255 }, -- slider knob while dragged: pure white
+  text     = { 255, 230, 235, 240 },  -- cool white
   muted    = { 255, 140, 150, 165 },
   focus    = { 255, 0, 180, 255 },   -- controller focus frame
 }
@@ -2372,7 +2373,7 @@ local function draw()
       ui(UI.track, tx, ty, tw, th); outline(UI.border, tx, ty, tw, th)
       local kx = knob_x(tx, tw, i)
       ui(UI.accent, tx, ty, kx - tx, th)
-      local kc = CAL.drag == i and { 255, 255, 255, 255 } or UI.knob
+      local kc = CAL.drag == i and UI.knob_drag or UI.knob
       ui(UI.border, kx - 11 / SX, ty - 11 / SY, 22 / SX, th + 22 / SY); ui(kc, kx - 10 / SX, ty - 10 / SY, 20 / SX, th + 20 / SY)
       local one = tx + tw * ((d.tick or 1) - d.min) / (d.max - d.min)
       local k = sh / 1080
