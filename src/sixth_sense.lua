@@ -233,6 +233,22 @@ local PALETTE = {
   light_blue = { ring = { 110, 200, 255 } },
 }
 _G.SIXTH_SENSE_PALETTE = PALETTE
+-- pretty-ui: the F7 menu's named colours, { a, r, g, b }
+local UI = {
+  bg       = { 215, 10, 14, 20 },     -- panel backing, near-black blue-grey
+  panel    = { 235, 16, 21, 29 },     -- help frame, a step lighter
+  btn      = { 200, 26, 32, 42 },     -- button, off
+  hover    = { 220, 38, 48, 62 },     -- button under the cursor
+  selected = { 240, 0, 120, 160 },    -- button, on
+  accent   = { 255, 0, 170, 220 },    -- teal-cyan: stripes, slider fill
+  border   = { 200, 58, 70, 86 },     -- 1 px outlines
+  track    = { 200, 40, 46, 56 },     -- slider track
+  tick     = { 200, 120, 130, 145 },  -- slider 1.0 tick
+  knob     = { 255, 230, 234, 238 },  -- slider knob (white while dragged)
+  text     = { 255, 241, 236, 228 },  -- warm white
+  muted    = { 255, 150, 156, 166 },
+  focus    = { 255, 255, 210, 80 },   -- controller focus frame
+}
 local VIS_COMMENT = [[; visibility (v1.4.5): shown (the radar is on screen) or hidden (it is not; the F7 calibration page still shows it so
 ; you can set it up). Shown / Hidden buttons on the F7 page's Settings tab (mouse only). (v145_migrated: v1.4.4's
 ; hud and always became shown once.)]]
@@ -1877,6 +1893,7 @@ local function pad_input(sw, sh)
   end
 end
 local function cal_input(sw, sh, gx, gy)
+  CAL.mgx, CAL.mgy = gx, gy                          -- pretty-ui: for hover
   if CAL.help then                                   -- v1.5.5: Help open: only the help's own clicks and the wheel
     if CAL.armed and S.t >= CAL.armed then CAL.armed = nil end
     help_mouse(gx, gy)
@@ -2313,10 +2330,25 @@ local function draw()
   if CAL.on then
     LAYER_NOW = 990
     local kk = sh / 1080
+    local function ui(c, x, y, w, h) gbox(x, y, w, h, c[1], c[2], c[3], c[4]) end
+    local function outline(c, x, y, w, h)
+      local t1, t2 = 1 / SX, 1 / SY
+      ui(c, x, y, w, t2); ui(c, x, y + h - t2, w, t2); ui(c, x, y, t1, h); ui(c, x + w - t1, y, t1, h)
+    end
+    local function over(x, y, w, h)
+      local mx, my = CAL.mgx, CAL.mgy
+      return mx and mx >= x and mx <= x + w and my >= y and my <= y + h
+    end
+    local function ui_button(x, y, w, h, label, on)      -- off / hover / on, with a border and an accent stripe when on
+      ui(on and UI.selected or (over(x, y, w, h) and UI.hover or UI.btn), x, y, w, h)
+      outline(on and UI.accent or UI.border, x, y, w, h)
+      if on then ui(UI.accent, x, y, w, 4 / SY) end
+      draw_label(gbox, label, x + w / 2 + (LABEL_TEX[label][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
+    end
     local px0, py0, px1, py1 = panel_box()
-    if CAL.tab == "settings" then gbox(px0, py0, px1 - px0, py1 - py0, 150, 10, 14, 20)   -- a dark backing
+    if CAL.tab == "settings" then ui(UI.bg, px0, py0, px1 - px0, py1 - py0); outline(UI.border, px0, py0, px1 - px0, py1 - py0)   -- a dark backing
     else
-      local x, y, w, h = tab_rect(1); gbox(x - 6 / SX, y - 48 / SY, 4 * w + 72 / SX, h + 54 / SY, 150, 10, 14, 20)
+      local x, y, w, h = tab_rect(1); ui(UI.bg, x - 6 / SX, y - 48 / SY, 4 * w + 72 / SX, h + 54 / SY)
       -- v1.4.6: this resolution and whether it has a saved layout (green) or not yet (amber)
       local txt = string.format("%dx%d %s", CAL.sw or 0, CAL.sh or 0, CAL.has_saved and "SAVED LAYOUT" or "NO SAVED LAYOUT")
       CAL.status = txt
@@ -2325,14 +2357,12 @@ local function draw()
     end
     local function button(i, label, on)
       local x, y, w, h = tab_rect(i)
-      gbox(x, y, w, h, on and 235 or 150, on and 0 or 40, on and 150 or 40, on and 200 or 50)
-      if on then gbox(x, y, w, 4 / SY, 255, 255, 255, 255) end
-      draw_label(gbox, label, x + w / 2 + (LABEL_TEX[label][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
+      ui_button(x, y, w, h, label, on)
     end
     if CAL.help then                                                         -- v1.5.5: the help page (under the buttons)
       local hx, hy, hw, hh, wpx, hpx = help_rect()
       local pg = HELP_PAGES[CAL.hpage or 1]
-      gbox(hx - 6 / SX, hy - 6 / SY, hw + 12 / SX, hh + 12 / SY, 235, 10, 14, 20)
+      ui(UI.panel, hx - 6 / SX, hy - 6 / SY, hw + 12 / SX, hh + 12 / SY)
       if pg and tex_centred(pg[1], hx + hw / 2, hy + hh / 2, wpx, hpx, "help page") then CAL.help_drawn = (CAL.help_drawn or 0) + 1
       else pixel_text(gbox, "HELP: SEE README.MD AND CONTROLS.MD", hx + 20 / SX, hy + hh / 2, 3 * kk, "left", 255, 255, 255, 255) end
     end
@@ -2343,10 +2373,11 @@ local function draw()
     for i = 1, #SL do                                                        -- the sliders: track, fill, knob, tick at 1.0
       local d = SL[i]
       local tx, ty, tw, th = slider_rect(i)
-      gbox(tx, ty, tw, th, 200, 60, 60, 60)
+      ui(UI.track, tx, ty, tw, th); outline(UI.border, tx, ty, tw, th)
       local kx = knob_x(tx, tw, i)
-      gbox(tx, ty, kx - tx, th, 220, d.rgb[1], d.rgb[2], d.rgb[3])
-      gbox(kx - 10 / SX, ty - 10 / SY, 20 / SX, th + 20 / SY, 250, 255, 255, 255)
+      ui(UI.accent, tx, ty, kx - tx, th)
+      local kc = CAL.drag == i and { 255, 255, 255, 255 } or UI.knob
+      ui(UI.border, kx - 11 / SX, ty - 11 / SY, 22 / SX, th + 22 / SY); ui(kc, kx - 10 / SX, ty - 10 / SY, 20 / SX, th + 20 / SY)
       local one = tx + tw * ((d.tick or 1) - d.min) / (d.max - d.min)
       local k = sh / 1080
       draw_label(gbox, d.name == "scale" and "size" or d.name, tx - 16 / SX, ty + th / 2, k)
@@ -2354,9 +2385,9 @@ local function draw()
         local c = (PALETTE[CFG.radar_color] or PALETTE.green)
         gbox(tx + tw + 18 / SX, ty + th / 2 - 14 / SY, 56 / SX, 28 / SY, 255, c.ring[1], c.ring[2], c.ring[3])
       else
-      pixel_text(gbox, slider_value(i), tx + tw + 18 / SX, ty + th / 2, 2 * k, "left", 240, d.rgb[1], d.rgb[2], d.rgb[3])
+      pixel_text(gbox, slider_value(i), tx + tw + 18 / SX, ty + th / 2, 2 * k, "left", UI.text[1], UI.text[2], UI.text[3], UI.text[4])
       end
-      gbox(one - 1 / SX, ty - 6 / SY, 2 / SX, th + 12 / SY, 230, 255, 255, 0)
+      ui(UI.tick, one - 1 / SX, ty - 6 / SY, 2 / SX, th + 12 / SY)
     end
     do                                                                       -- v1.4.5: Shown / Hidden buttons
       local x1_, y1_, w1_, h1_ = vis_rect(1)
@@ -2364,10 +2395,7 @@ local function draw()
       for i = 1, #VIS_BTN do
         local x, y, w, h = vis_rect(i)
         local on = CFG.visibility == VIS_BTN[i].id
-        gbox(x, y, w, h, on and 235 or 150, on and 0 or 40, on and 150 or 40, on and 200 or 50)
-        if on then gbox(x, y, w, 4 / SY, 255, 255, 255, 255) end
-        local lb = VIS_BTN[i].label
-        draw_label(gbox, lb, x + w / 2 + (LABEL_TEX[lb][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
+        ui_button(x, y, w, h, VIS_BTN[i].label, on)
       end
     end
     do                                                                       -- v1.5.4: Controls buttons
@@ -2376,10 +2404,7 @@ local function draw()
       for i = 1, #CTL_BTN do
         local x, y, w, h = ctl_rect(i)
         local on = CFG.control == CTL_BTN[i].id
-        gbox(x, y, w, h, on and 235 or 150, on and 0 or 40, on and 150 or 40, on and 200 or 50)
-        if on then gbox(x, y, w, 4 / SY, 255, 255, 255, 255) end
-        local lb = CTL_BTN[i].label
-        draw_label(gbox, lb, x + w / 2 + (LABEL_TEX[lb][2] * 30 / 48 * kk) / 2 / SX, y + h / 2, kk)
+        ui_button(x, y, w, h, CTL_BTN[i].label, on)
       end
     end
     if not kbm then                                                          -- v1.5.4: the controller's row, framed yellow
@@ -2391,8 +2416,8 @@ local function draw()
         x, y, w, h = xa - 6 / SX, ya - 6 / SY, xb + wb - xa + 12 / SX, ha + 12 / SY
       end
       local t1, t2 = 3 / SX, 3 / SY
-      gbox(x, y, w, t2, 255, 255, 230, 0); gbox(x, y + h - t2, w, t2, 255, 255, 230, 0)
-      gbox(x, y, t1, h, 255, 255, 230, 0); gbox(x + w - t1, y, t1, h, 255, 255, 230, 0)
+      ui(UI.focus, x, y, w, t2); ui(UI.focus, x, y + h - t2, w, t2)
+      ui(UI.focus, x, y, t1, h); ui(UI.focus, x + w - t1, y, t1, h)
       CAL.sel_drawn = (CAL.sel_drawn or 0) + 1
     end
     end
