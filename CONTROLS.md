@@ -1,7 +1,7 @@
-# Sixth Sense: controls (v1.5.6)
+# Sixth Sense: controls (v1.6.0)
 
-> On-request document: written when asked, not updated every commit. It describes v1.5.6
-> (`src/sixth_sense.lua`); regenerated for v1.5.6 (public repo links). Online: https://github.com/lankynibbs/SixthSense/blob/develop/CONTROLS.md (source: https://github.com/lankynibbs/SixthSense). The same text is built into the mod: press Help on the F7 page. For an overview see [README.md](README.md), per-version notes [docs/history/version-notes.md](docs/history/version-notes.md), and [CHANGELOG.md](CHANGELOG.md).
+> On-request document: written when asked, not updated every commit. It describes v1.6.0
+> (`src/sixth_sense.lua`); regenerated for v1.6.0 (user interface cleanup; controls unchanged since v1.5.6). Online: https://github.com/lankynibbs/SixthSense/blob/develop/CONTROLS.md (source: https://github.com/lankynibbs/SixthSense). The same text is built into the mod: press Help on the F7 page. For an overview see [README.md](README.md), per-version notes [docs/history/version-notes.md](docs/history/version-notes.md), and [CHANGELOG.md](CHANGELOG.md).
 
 Sixth Sense is a 360° enemy radar that turns with your view (up is where you look). Red
 squares are enemies, red diamonds are enemy structures (turrets), the white square in the middle is you.

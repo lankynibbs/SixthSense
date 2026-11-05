@@ -1,11 +1,11 @@
 -- HD2-Addon: mods/darryl/sixth_sense
--- Sixth Sense v1.5.6 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
+-- Sixth Sense v1.6.0 (formerly Rear Heat HUD) for Bingus Shared Loader (HellForge, game build 25480438, LuaJIT).
 -- Three bars at the bottom (left-rear, rear, right-rear) glow clear -> yellow -> red with the threat behind you.
 -- v0.2: enemies are found by walking World.units and reading each unit's resource id (no World.units_by_resource),
 -- a discovery mode logs every unit kind near you, and an optional "candidate enemy" heuristic works without a list.
 -- Read-only: it changes nothing in the game.
 
-local MOD, VERSION = "sixth_sense", "1.5.6"
+local MOD, VERSION = "sixth_sense", "1.6.0"
 local RUNTIME_HEX = "46cab355bd8d4d37"   -- runtime-built units: asking their position/rotation/meshes/box ends the game
 
 -- ---------------------------------------------------------------- engine access (every call pcall'd)
@@ -1162,7 +1162,7 @@ local HELP_TEXT = [==[
 
 **A 360° enemy radar HUD for Helldivers 2, running under HellForge with Bingus Shared Loader.**
 
-Version **1.5.6** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
+Version **1.6.0** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
 
 ![Sixth Sense radar preview](docs/images/radar_preview_green.png)
 
@@ -1228,7 +1228,7 @@ Settings from the older **Rear Heat HUD** (`rear_heat_hud.ini`) are copied over 
 - Source: `src/sixth_sense.lua` (plus `src/enemy_tiers.lua.inc`). Build: `python3 tools/build.py` writes
   `SixthSense.zip` (needs the sibling `BingusSharedLoader` and `Treasure-Radar` checkouts). Offline test:
   `python3 tests/stub_test.py` (needs `lupa`).
-- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.5.6", the GUID above) and
+- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.6.0", the GUID above) and
   `Addon/9ba626afa44a3aa3.patch_0` with its `.gpu_resources` and `.stream`: the Lua addon plus the textures from
   `assets/` (the radar disc, the F7 page's word labels and the Help pages). The Help pages (`assets/help_*.png`)
   and the text embedded in the Lua are made from README.md and CONTROLS.md by `tools/help_pages.py`, which
@@ -1241,10 +1241,10 @@ Bingus Shared Loader (CowboyBingus), HellForge; texture drawing after Treasure R
 Shared Loader; labels set in Poppins Bold (SIL Open Font License); Help pages set in DejaVu Sans (`tools/fonts/`, its licence alongside).
 
 ==== CONTROLS (CONTROLS.md) ====
-# Sixth Sense: controls (v1.5.6)
+# Sixth Sense: controls (v1.6.0)
 
-> On-request document: written when asked, not updated every commit. It describes v1.5.6
-> (`src/sixth_sense.lua`); regenerated for v1.5.6 (public repo links). Online: https://github.com/lankynibbs/SixthSense/blob/develop/CONTROLS.md (source: https://github.com/lankynibbs/SixthSense). The same text is built into the mod: press Help on the F7 page. For an overview see [README.md](README.md), per-version notes [docs/history/version-notes.md](docs/history/version-notes.md), and [CHANGELOG.md](CHANGELOG.md).
+> On-request document: written when asked, not updated every commit. It describes v1.6.0
+> (`src/sixth_sense.lua`); regenerated for v1.6.0 (user interface cleanup; controls unchanged since v1.5.6). Online: https://github.com/lankynibbs/SixthSense/blob/develop/CONTROLS.md (source: https://github.com/lankynibbs/SixthSense). The same text is built into the mod: press Help on the F7 page. For an overview see [README.md](README.md), per-version notes [docs/history/version-notes.md](docs/history/version-notes.md), and [CHANGELOG.md](CHANGELOG.md).
 
 Sixth Sense is a 360° enemy radar that turns with your view (up is where you look). Red
 squares are enemies, red diamonds are enemy structures (turrets), the white square in the middle is you.

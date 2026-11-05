@@ -2,7 +2,7 @@
 
 **A 360° enemy radar HUD for Helldivers 2, running under HellForge with Bingus Shared Loader.**
 
-Version **1.5.6** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
+Version **1.6.0** · GUID `bb72454c-ccd3-4e9b-927c-fcd80a09baf1`
 
 ![Sixth Sense radar preview](docs/images/radar_preview_green.png)
 
@@ -68,7 +68,7 @@ Settings from the older **Rear Heat HUD** (`rear_heat_hud.ini`) are copied over 
 - Source: `src/sixth_sense.lua` (plus `src/enemy_tiers.lua.inc`). Build: `python3 tools/build.py` writes
   `SixthSense.zip` (needs the sibling `BingusSharedLoader` and `Treasure-Radar` checkouts). Offline test:
   `python3 tests/stub_test.py` (needs `lupa`).
-- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.5.6", the GUID above) and
+- Release zip contents (`SixthSense.zip`): `manifest.json` (name "Sixth Sense v1.6.0", the GUID above) and
   `Addon/9ba626afa44a3aa3.patch_0` with its `.gpu_resources` and `.stream`: the Lua addon plus the textures from
   `assets/` (the radar disc, the F7 page's word labels and the Help pages). The Help pages (`assets/help_*.png`)
   and the text embedded in the Lua are made from README.md and CONTROLS.md by `tools/help_pages.py`, which
